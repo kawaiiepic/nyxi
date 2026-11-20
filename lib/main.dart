@@ -84,7 +84,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
       name: 'Starbucks',
       note: 'Yesterday · Coffee',
       amount: -24.33,
-      symbol: CupertinoIcons.cup_and_saucer_fill,
+      symbol: CupertinoIcons.cart_fill,
       tint: Color(0xFF027651),
     ),
     const MoneyActivity(
@@ -1262,7 +1262,7 @@ class _DreamyBackdrop extends StatelessWidget {
                 height: height * 0.56,
                 child: _BlurCircle(
                   color: const Color(0xFF80EF6F),
-                  blur: math.max(50, width * 0.14),
+                  blur: math.max(50.0, width * 0.14),
                 ),
               ),
               Positioned(
@@ -1272,7 +1272,7 @@ class _DreamyBackdrop extends StatelessWidget {
                 height: height * 0.5,
                 child: _BlurCircle(
                   color: const Color(0xFFFFAEDA),
-                  blur: math.max(60, width * 0.19),
+                  blur: math.max(60.0, width * 0.19),
                 ),
               ),
               Positioned(
@@ -1282,7 +1282,7 @@ class _DreamyBackdrop extends StatelessWidget {
                 height: height * 0.52,
                 child: _BlurCircle(
                   color: const Color(0xFFFFC9E6),
-                  blur: math.max(70, width * 0.2),
+                  blur: math.max(70.0, width * 0.2),
                 ),
               ),
             ],
