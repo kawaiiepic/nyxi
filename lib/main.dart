@@ -782,7 +782,6 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
       unselectedIconColor: NyxiPalette.muted,
       unselectedLabelColor: NyxiPalette.muted,
       indicatorColor: const Color(0x36F078BE),
-      quality: GlassQuality.standard,
     );
   }
 
@@ -946,17 +945,13 @@ class _PillButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => CupertinoButton(
-        onPressed: onTap,
-        minSize: 0,
-        padding: EdgeInsets.zero,
-        child: Container(
-          height: 46,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: CupertinoColors.white,
-            borderRadius: BorderRadius.circular(30),
-          ),
+  Widget build(BuildContext context) => GlassButton.custom(
+        onTap: onTap,
+        height: 46,
+        shape: const LiquidRoundedSuperellipse(borderRadius: 30),
+        surfaceStyle: GlassSurfaceStyle.solid,
+        color: CupertinoColors.white,
+        child: Center(
           child: Text(
             text,
             style: const TextStyle(
