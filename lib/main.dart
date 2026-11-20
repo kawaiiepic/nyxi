@@ -442,7 +442,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
               Text('Cash balance',
                   style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w650,
+                      fontWeight: FontWeight.w600,
                       color: NyxiPalette.ink)),
               SizedBox(width: 6),
               Icon(CupertinoIcons.chevron_right, size: 12),
@@ -892,7 +892,7 @@ class _SectionHeader extends StatelessWidget {
               child: Text(name,
                   style: const TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w750,
+                      fontWeight: FontWeight.w700,
                       color: NyxiPalette.ink)),
             ),
             if (onTap != null)
@@ -939,7 +939,7 @@ class _ActivityRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w750,
+                          fontWeight: FontWeight.w700,
                           color: NyxiPalette.ink,
                         )),
                     const SizedBox(height: 3),
@@ -1025,7 +1025,7 @@ class _FeatureRow extends StatelessWidget {
             Expanded(
               child: Text(label,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w650, fontSize: 13)),
+                      fontWeight: FontWeight.w600, fontSize: 13)),
             ),
             const Icon(CupertinoIcons.chevron_right,
                 color: NyxiPalette.muted, size: 14),
