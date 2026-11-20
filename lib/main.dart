@@ -3,10 +3,16 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const NyxiApp());
+  await LiquidGlassWidgets.initialize(enablePerformanceMonitor: false);
+  runApp(LiquidGlassWidgets.wrap(
+    child: const NyxiApp(),
+    adaptiveQuality: true,
+    theme: const GlassThemeData.ios27(),
+  ));
 }
 
 /// Nyxi's prototype contains demo money only. Real financial actions require
@@ -220,13 +226,17 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final desktop = screenWidth > 520;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    // GlassPage owns the sampled pastel background, while the content keeps
+    // the reference's clear white surfaces and bright magenta header.
+    return GlassPage(
+      background: const _DreamyBackdrop(),
+      enableBackgroundSampling: true,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: CupertinoPageScaffold(
-        backgroundColor: const Color(0xFFF4E8F1),
+        backgroundColor: CupertinoColors.transparent,
         child: Stack(
           children: [
-            const Positioned.fill(child: _DreamyBackdrop()),
             Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(
@@ -313,6 +323,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -594,8 +605,8 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
                       ],
                     ),
                   ),
-                  CupertinoSwitch(
-                    activeTrackColor: NyxiPalette.pink,
+                  GlassSwitch(
+                    activeColor: NyxiPalette.pink,
                     value: _cardFrozen,
                     onChanged: (value) =>
                         setState(() => _cardFrozen = value),
@@ -751,72 +762,30 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
   }
 
   Widget _bottomNavigation() {
-    final items = <(IconData, String)>[
-      (CupertinoIcons.house_fill, 'Home'),
-      (CupertinoIcons.creditcard, 'Cards'),
-      (CupertinoIcons.chart_bar_fill, 'Activity'),
-      (CupertinoIcons.heart_fill, 'Savings'),
-    ];
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(32),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 17, sigmaY: 17),
-        child: Container(
-          height: 64,
-          decoration: BoxDecoration(
-            color: const Color(0xF5FFFFFF),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: const Color(0xFFECE6EA)),
-            boxShadow: const [
-              BoxShadow(
-                blurRadius: 25,
-                color: Color(0x1A382030),
-                offset: Offset(0, 7),
-              )
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              for (var i = 0; i < items.length; i++)
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() => _tab = i),
-                  child: SizedBox(
-                    width: 68,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          items[i].$1,
-                          size: 22,
-                          color: _tab == i
-                              ? NyxiPalette.berry
-                              : NyxiPalette.muted,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          items[i].$2,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: _tab == i
-                                ? FontWeight.w800
-                                : FontWeight.w500,
-                            color: _tab == i
-                                ? NyxiPalette.berry
-                                : NyxiPalette.muted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
+    // A real liquid glass navigation pill with an animated selected lens.
+    // The content cards stay opaque so text and financial amounts remain clear.
+    return GlassTabBar.bottom(
+      tabs: const [
+        GlassTab(icon: Icon(CupertinoIcons.house_fill), label: 'Home'),
+        GlassTab(icon: Icon(CupertinoIcons.creditcard), label: 'Cards'),
+        GlassTab(icon: Icon(CupertinoIcons.chart_bar_fill), label: 'Activity'),
+        GlassTab(icon: Icon(CupertinoIcons.heart_fill), label: 'Savings'),
+      ],
+      selectedIndex: _tab,
+      onTabSelected: (index) => setState(() => _tab = index),
+      horizontalPadding: 0,
+      verticalPadding: 0,
+      barHeight: 64,
+      iconSize: 22,
+      selectedIconColor: NyxiPalette.berry,
+      selectedLabelColor: NyxiPalette.berry,
+      unselectedIconColor: NyxiPalette.muted,
+      unselectedLabelColor: NyxiPalette.muted,
+      indicatorColor: const Color(0x36F078BE),
+      quality: GlassQuality.standard,
     );
   }
+
 }
 
 class _PageIntro extends StatelessWidget {
@@ -865,13 +834,10 @@ class _WhiteCard extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => GlassContainer.card(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(16, 17, 16, 15),
-        decoration: BoxDecoration(
-          color: CupertinoColors.white,
-          borderRadius: BorderRadius.circular(25),
-        ),
+        surfaceStyle: GlassSurfaceStyle.solid,
         child: child,
       );
 }

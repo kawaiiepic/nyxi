@@ -4,12 +4,14 @@ publish_to: none
 version: 0.1.0+1
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: '>=3.41.0'
 
 dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  liquid_glass_widgets: ^1.19.0
 
 dev_dependencies:
   flutter_test:
