@@ -54,6 +54,7 @@ class KlutchController extends ChangeNotifier {
   List<KlutchCard> cards = const [];
   List<KlutchTransaction> transactions = const [];
   KlutchMonthlyInsight? monthlyInsight;
+  KlutchCreditBalance? creditBalance;
   DateTime? lastSynced;
   bool loading = false;
   bool connected = false;
@@ -71,6 +72,7 @@ class KlutchController extends ChangeNotifier {
     cards = const [];
     transactions = const [];
     monthlyInsight = null;
+    creditBalance = null;
     lastSynced = null;
     error = null;
     _emit();
@@ -86,6 +88,7 @@ class KlutchController extends ChangeNotifier {
       cards = const [];
       transactions = const [];
       monthlyInsight = null;
+      creditBalance = null;
       lastSynced = null;
       if (!api.signedIn) {
         user = null;
@@ -113,15 +116,18 @@ class KlutchController extends ChangeNotifier {
         api.cards(),
         api.transactions(),
         api.monthlyInsight(),
+        api.creditBalance(),
       ]);
       cards = results[0] as List<KlutchCard>;
       transactions = results[1] as List<KlutchTransaction>;
       monthlyInsight = results[2] as KlutchMonthlyInsight;
+      creditBalance = results[3] as KlutchCreditBalance;
       lastSynced = DateTime.now();
     } else {
       cards = const [];
       transactions = const [];
       monthlyInsight = null;
+      creditBalance = null;
       lastSynced = null;
     }
   }
@@ -147,7 +153,7 @@ class KlutchController extends ChangeNotifier {
   Future<void> disconnect() => _work(() async {
     await api.disconnectKlutch();
     connected = false; cards = const []; transactions = const [];
-    monthlyInsight = null; lastSynced = null;
+    monthlyInsight = null; creditBalance = null; lastSynced = null;
   });
 
   Future<void> logout() => _work(() async {
