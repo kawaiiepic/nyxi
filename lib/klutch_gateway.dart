@@ -175,6 +175,11 @@ class KlutchGateway {
         : <KlutchTransaction>[];
   }
 
+  Future<KlutchMonthlyInsight> monthlyInsight() async {
+    final json = await _request('/api/klutch/insights');
+    return KlutchMonthlyInsight.fromJson(json);
+  }
+
   Future<KlutchCard> createVirtualCard(String name) async {
     // One random request identifier per issuance. The server tracks uncertain
     // requests so a lost response cannot silently duplicate a card.
@@ -286,4 +291,26 @@ class KlutchTransaction {
   final String status;
   final String type;
   final String cardId;
+}
+
+class KlutchMonthlyInsight {
+  const KlutchMonthlyInsight({
+    required this.period,
+    required this.currency,
+    required this.settledCharges,
+  });
+
+  factory KlutchMonthlyInsight.fromJson(Map<String, dynamic> json) {
+    final amount = json['settledCharges'];
+    return KlutchMonthlyInsight(
+      period: json['period'] is String ? json['period'] as String : '',
+      currency: json['currency'] is String ? json['currency'] as String : 'USD',
+      settledCharges: amount is num && amount.isFinite ? amount.toDouble() : null,
+    );
+  }
+
+  final String period;
+  final String currency;
+  /// Null means data is unavailable. Never replace null with a fake zero.
+  final double? settledCharges;
 }
