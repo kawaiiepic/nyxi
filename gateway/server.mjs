@@ -22,7 +22,7 @@ const TRANSACTIONS = `query ($sortOrder: TransactionSortOrder, $limit: Int) {
 }`;
 
 const CREATE_CARD = `mutation ($name: String, $media: CardMedia) {
-  createCard(name: $name, media: $media) { id name status lastFour expirationDate media lockState }
+  createCard(name: $name, media: $media) { id name status lastFour expirationDate media }
 }`;
 
 function asObject(value) {
