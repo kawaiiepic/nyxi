@@ -7,14 +7,16 @@ A cybercute Flutter finance dashboard with Cupertino, `liquid_glass_widgets`, an
 - **Flutter app:** [kawaiiepic/nyxi](https://github.com/kawaiiepic/nyxi) (this repository)
 - **Fluz API + Docker Compose deployment:** [kawaiiepic/nyxi-backend](https://github.com/kawaiiepic/nyxi-backend) (private)
 
-All financial API credentials, Fluz OAuth secrets, transaction webhook verification and SQLite storage belong to **`nyxi-backend`**. The Flutter app never needs a Fluz API key. The backend repository includes the `Dockerfile`, `docker-compose.yml`, `.env.example`, `.dockerignore`, tests and deployment guide.
+All financial API credentials, Fluz OAuth secrets, transaction webhook verification and SQLite storage belong to **`nyxi-backend`**. The Flutter app never needs a Fluz API key.
+
+The public [Nyxi landing page](https://nyxi.blossomvale.dev/) is served separately through Traefik when deployed with the backend repository's optional Traefik Compose overlay. On the same domain, `/api/*` and `/health` route to the authenticated Node API. The landing page itself doesn't contain financial data. The backend repository includes the `Dockerfile`, `docker-compose.yml`, `.env.example`, `.dockerignore`, tests and deployment guide.
 
 ## Run Flutter
 
 ```bash
 flutter create --platforms=android,ios,linux,windows .
 flutter pub get
-flutter run -d linux --dart-define=NYXI_API_URL=https://api.yourdomain.example
+flutter run -d linux --dart-define=NYXI_API_URL=https://nyxi.blossomvale.dev
 ```
 
 Flutter 3.41+ is required. Platform runner directories are generated locally. Your backend must be reachable via **HTTPS** from the device. For development only, Nyxi also allows `localhost`, `127.0.0.1`, and Android emulator `10.0.2.2` over plain HTTP. Android/iOS devices cannot use the Linux desktop's `127.0.0.1`; use your backend HTTPS hostname.
