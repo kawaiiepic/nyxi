@@ -356,9 +356,9 @@ class _DesktopTopBar extends StatelessWidget {
               color: const Color(0xFFFFEDF6),
               borderRadius: BorderRadius.circular(99),
             ),
-            child: const Text(
+            child: Text(
               statusLabel,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Color(0xFFA92079),
                 fontWeight: FontWeight.w700,
                 fontSize: 10,
