@@ -29,6 +29,29 @@ The Flutter platform runner directories are intentionally generated locally. The
 - All views share one in-memory demo state, so balances and card controls
   survive resizing, but reset when the app restarts.
 
+## Mandatory online sign-in
+
+Nyxi has **no guest, offline or demo-only bypass**. On startup, every
+desktop and mobile device checks the central backend's `GET /health`
+response. It must identify the Nyxi service before the sign-in form appears.
+A successful login is then confirmed with `GET /api/auth/me` before the
+dashboard is mounted. Registering a new account follows the same checks.
+
+The app checks backend availability and session validity every **12 seconds**,
+and verifies again when resumed from the background. If the backend is
+unreachable, times out, returns an invalid health response or rejects the
+current session, the dashboard is immediately replaced by a lock/sign-in
+screen. The UI **never** falls back to sample financial data on failure.
+The lock screen offers Retry, and it periodically rechecks automatically.
+
+The health request has a five-second HTTP timeout and the gate limits each
+check to six seconds. The in-memory session may regain access after an outage
+only if the backend responds and validates that same account again. Restarting
+Nyxi always requires signing in because access tokens are not persisted.
+
+To test these behaviors, run `flutter test test/nyxi_app_test.dart`.
+The tests use a simulated Nyxi backend and do not require live Klutch keys.
+
 ## Nyxi accounts and Klutch integration
 
 Nyxi now supports **central account registration, login, and per-user Klutch
