@@ -134,11 +134,13 @@ class FluzController extends ChangeNotifier {
     }
   });
 
-  Future<bool> createVirtualCard(String name, double limit, String offerId) async {
+  Future<bool> createVirtualCard(String name, double limit, String offerId,
+      {String fundingSource = 'FLUZ_BALANCE', String? bankAccountId}) async {
     if (loading || !signedIn || !connected) return false;
     var created = false;
     await _work(() async {
-      final card = await api.createVirtualCard(name: name, spendLimit: limit, offerId: offerId);
+      final card = await api.createVirtualCard(name: name, spendLimit: limit,
+        offerId: offerId, fundingSource: fundingSource, bankAccountId: bankAccountId);
       cards = [card, ...cards.where((other) => other.id != card.id)];
       created = true;
     });
@@ -247,12 +249,15 @@ class FluzCardsPanel extends StatelessWidget {
 
   Future<void> _createCard(BuildContext context) async {
     List<FluzOffer> offers;
-    try { offers = await controller.api.offers(); }
-    catch (error) {
+    List<FluzBankAccount> banks;
+    try {
+      offers = await controller.api.offers();
+      banks = await controller.api.bankAccounts();
+    } catch (error) {
       if (!context.mounted) return;
       await showCupertinoDialog<void>(context: context,
         builder: (dialog) => CupertinoAlertDialog(
-          title: const Text('Card programs unavailable'),
+          title: const Text('Funding and card programs unavailable'),
           content: Text(error.toString()),
           actions: [CupertinoDialogAction(
             onPressed: () => Navigator.of(dialog).pop(), child: const Text('OK'))]));
@@ -271,14 +276,16 @@ class FluzCardsPanel extends StatelessWidget {
     var name = '';
     var amount = '';
     var selected = 0;
+    var selectedFunding = 0;
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (dialog) => CupertinoAlertDialog(
-        title: const Text('Issue a Fluz virtual card?'),
+        title: const Text('Issue a real Fluz virtual card?'),
         content: Column(children: [
           const SizedBox(height: 10),
-          const Text('Real money may be reserved at creation. Funding is from Fluz balance. '
-              'Choose an eligible program and confirm the exact spending limit.'),
+          const Text('Card creation may reserve or charge real money. '
+              'Bank funding can trigger an ACH debit and a backup-card hold. '
+              'Confirm the funding source, card program and limit.'),
           const SizedBox(height: 10),
           CupertinoTextField(onChanged: (v) => name = v.trim(),
             maxLength: 60, placeholder: 'Card name'),
@@ -287,12 +294,25 @@ class FluzCardsPanel extends StatelessWidget {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             placeholder: 'Spending limit (USD)'),
           const SizedBox(height: 10),
-          SizedBox(height: 108, child: CupertinoPicker(
+          const Text('Card program', style: TextStyle(fontSize: 11)),
+          SizedBox(height: 95, child: CupertinoPicker(
             itemExtent: 34,
             onSelectedItemChanged: (index) => selected = index,
             children: [for (final offer in offers) Text(offer.programName,
               overflow: TextOverflow.ellipsis)],
           )),
+          const Text('Funding source', style: TextStyle(fontSize: 11)),
+          SizedBox(height: 95, child: CupertinoPicker(
+            itemExtent: 34,
+            onSelectedItemChanged: (index) => selectedFunding = index,
+            children: [
+              const Text('Fluz wallet', overflow: TextOverflow.ellipsis),
+              for (final bank in banks)
+                Text(bank.description, overflow: TextOverflow.ellipsis),
+            ],
+          )),
+          const Text('To link a new bank account, use Fluz or its Plaid flow first.',
+            style: TextStyle(fontSize: 10)),
         ]),
         actions: [
           CupertinoDialogAction(
@@ -307,7 +327,11 @@ class FluzCardsPanel extends StatelessWidget {
     if (confirmed == true && name.length >= 2) {
       final limit = double.tryParse(amount);
       if (limit != null && limit.isFinite && limit > 0) {
-        await controller.createVirtualCard(name, limit, offers[selected].offerId);
+        final bank = selectedFunding == 0 ? null : banks[selectedFunding - 1];
+        await controller.createVirtualCard(name, limit, offers[selected].offerId,
+          fundingSource: bank == null ? 'FLUZ_BALANCE' : 'BANK_ACCOUNT',
+          bankAccountId: bank?.id,
+        );
       }
     }
   }
