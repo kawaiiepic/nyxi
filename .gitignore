@@ -26,3 +26,9 @@ windows/flutter/ephemeral/
 .env
 .env.*
 !.env.example
+
+# Local account database and SQLite journals
+.data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
