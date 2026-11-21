@@ -18,10 +18,9 @@ class FluzGateway {
     _client.connectionTimeout = const Duration(seconds: 10);
   }
 
-  static const endpoint = String.fromEnvironment(
-    'NYXI_API_URL',
-    defaultValue: 'http://127.0.0.1:8787',
-  );
+  /// Production backend for Nyxi on all supported platforms.
+  /// Tests may inject a local baseUrl through the constructor.
+  static const endpoint = 'https://nyxi.blossomvale.dev';
 
   final Uri _base;
   final HttpClient _client;
