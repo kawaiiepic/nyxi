@@ -47,6 +47,8 @@ class KlutchController extends ChangeNotifier {
   NyxiUser? user;
   List<KlutchCard> cards = const [];
   List<KlutchTransaction> transactions = const [];
+  KlutchMonthlyInsight? monthlyInsight;
+  DateTime? lastSynced;
   bool loading = false;
   bool connected = false;
   String? error;
@@ -62,6 +64,8 @@ class KlutchController extends ChangeNotifier {
     connected = false;
     cards = const [];
     transactions = const [];
+    monthlyInsight = null;
+    lastSynced = null;
     error = null;
     _emit();
   }
@@ -73,6 +77,10 @@ class KlutchController extends ChangeNotifier {
       await task();
     } catch (failure) {
       error = failure.toString();
+      cards = const [];
+      transactions = const [];
+      monthlyInsight = null;
+      lastSynced = null;
       if (!api.signedIn) {
         user = null;
         connected = false;
@@ -95,11 +103,20 @@ class KlutchController extends ChangeNotifier {
   Future<void> _loadConnection() async {
     connected = await api.status();
     if (connected) {
-      final results = await Future.wait<Object>([api.cards(), api.transactions()]);
+      final results = await Future.wait<Object>([
+        api.cards(),
+        api.transactions(),
+        api.monthlyInsight(),
+      ]);
       cards = results[0] as List<KlutchCard>;
       transactions = results[1] as List<KlutchTransaction>;
+      monthlyInsight = results[2] as KlutchMonthlyInsight;
+      lastSynced = DateTime.now();
     } else {
-      cards = const []; transactions = const [];
+      cards = const [];
+      transactions = const [];
+      monthlyInsight = null;
+      lastSynced = null;
     }
   }
 
@@ -124,6 +141,7 @@ class KlutchController extends ChangeNotifier {
   Future<void> disconnect() => _work(() async {
     await api.disconnectKlutch();
     connected = false; cards = const []; transactions = const [];
+    monthlyInsight = null; lastSynced = null;
   });
 
   Future<void> logout() => _work(() async {
