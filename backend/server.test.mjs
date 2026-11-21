@@ -149,7 +149,7 @@ test('Nyxi user login, Fluz consent and encrypted connection remain isolated', a
   assert.equal(balance.body.outstandingBalance, null);
   const insights = await call('/api/fluz/insights', 'GET', first.body.token);
   assert.equal(insights.body.settledCharges, 12.5);
-  assert.match(insights.body.period, /^\\d{4}-\\d{2}$/);
+  assert.match(insights.body.period, /^\d{4}-\d{2}$/);
   const offers = await call('/api/fluz/offers', 'GET', first.body.token);
   assert.equal(offers.body.offers[0].offerId, offerId);
   assert.equal((await call('/api/fluz/cards', 'POST', first.body.token, {
