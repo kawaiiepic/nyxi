@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatf
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'desktop_shell.dart';
-import 'klutch_gateway.dart';
-import 'klutch_panel.dart';
+import 'fluz_gateway.dart';
+import 'fluz_panel.dart';
 import 'nyxi_auth_gate.dart';
 
 Future<void> main() async {
@@ -19,7 +19,7 @@ Future<void> main() async {
 
 class NyxiApp extends StatelessWidget {
   const NyxiApp({super.key, this.controller});
-  final KlutchController? controller;
+  final FluzController? controller;
 
   @override
   Widget build(BuildContext context) => CupertinoApp(
@@ -54,7 +54,7 @@ String money(num amount) =>
 
 class NyxiDashboard extends StatefulWidget {
   const NyxiDashboard({super.key, required this.controller});
-  final KlutchController controller;
+  final FluzController controller;
 
   @override
   State<NyxiDashboard> createState() => _NyxiDashboardState();
@@ -62,7 +62,7 @@ class NyxiDashboard extends StatefulWidget {
 
 class _NyxiDashboardState extends State<NyxiDashboard> {
   int _tab = 0;
-  KlutchController get account => widget.controller;
+  FluzController get account => widget.controller;
   static const _tabs = ['Overview', 'Cards', 'Activity', 'Insights'];
 
   bool get _desktopPlatform =>
@@ -81,7 +81,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
               title: _tabs[_tab],
               statusLabel: account.connected
                   ? 'KLUTCH CONNECTED'
-                  : 'NO BANK CONNECTED',
+                  : 'NO FLUZ CONNECTION',
               onTabSelected: (index) => setState(() => _tab = index),
               onOpenSettings: _openSettings,
               onRefresh: account.loading ? () {} : account.refresh,
@@ -212,8 +212,8 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
                               const SizedBox(height: 10),
                               Text(
                                 account.connected
-                                    ? 'Klutch connected · live account data'
-                                    : 'Connect Klutch to load your cards and activity',
+                                    ? 'Fluz connected · live account data'
+                                    : 'Connect Fluz to load your cards and activity',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: Color(0xFFFFDDEB),
@@ -326,7 +326,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
         _heading(
           'your money, in focus',
           account.connected
-              ? 'Financial activity from your connected Klutch account'
+              ? 'Activity from your connected Fluz account'
               : 'Connect a financial provider to see your accounts',
         ),
         const SizedBox(height: 22),
@@ -352,7 +352,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
             ],
           ),
         const SizedBox(height: 18),
-        _creditBalancePanel(),
+        _walletBalancePanel(),
         const SizedBox(height: 18),
         if (wide)
           Row(
@@ -424,7 +424,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
           Text(
             insight?.period.isNotEmpty == true
                 ? 'Month to date · ${insight!.period} · USD'
-                : 'Month to date · Klutch',
+                : 'Month to date · Fluz',
             style: const TextStyle(
               fontSize: 12,
               color: Color(0xFFFFCEE8),
@@ -434,9 +434,9 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
           Text(
             account.connected
                 ? amount == null
-                    ? 'Klutch has not returned a verified spending total.'
-                    : 'Calculated from settled Klutch card charges.'
-                : 'Connect Klutch to load your actual spending.',
+                    ? 'Fluz has not returned a verified spending total.'
+                    : 'Calculated from settled Fluz virtual-card purchases.'
+                : 'Connect Fluz to load your actual spending.',
             style: const TextStyle(
               color: Color(0xFFFFE0F0),
               fontSize: 11,
@@ -460,45 +460,30 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
     );
   }
 
-  Widget _creditBalancePanel() {
-    final balance = account.creditBalance;
+  Widget _walletBalancePanel() {
+    final balance = account.walletBalance;
     return _panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Klutch credit account',
+          const Text('Fluz wallet balance',
               style: TextStyle(
                 color: NyxiPalette.ink,
                 fontWeight: FontWeight.w800,
                 fontSize: 15,
               )),
           const SizedBox(height: 9),
-          const Text(
-            'Real revolving credit figures from Klutch',
-            style: TextStyle(fontSize: 11, color: NyxiPalette.muted),
-          ),
+          const Text('Verified wallet funds held with Fluz',
+            style: TextStyle(fontSize: 11, color: NyxiPalette.muted)),
           const SizedBox(height: 19),
-          _metricRow(
-            'Outstanding credit balance',
-            balance?.outstandingBalance == null
-                ? 'Not available'
-                : money(balance!.outstandingBalance!),
-          ),
-          const SizedBox(height: 13),
-          _metricRow(
-            'Credit limit',
-            balance?.creditLimit == null
-                ? 'Not available'
-                : money(balance!.creditLimit!),
-          ),
+          _metricRow('Available wallet funds',
+            balance?.walletAvailable == null
+              ? 'Not available' : money(balance!.walletAvailable!)),
           const SizedBox(height: 11),
           const Text(
-            'These are credit-card values, not cash in a bank account.',
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.4,
-              color: NyxiPalette.muted,
-            ),
+            'Fluz wallet funds are not your Chase checking balance. '
+            'Nyxi does not infer checking funds or credit limits.',
+            style: TextStyle(fontSize: 11, height: 1.4, color: NyxiPalette.muted),
           ),
         ],
       ),
@@ -530,7 +515,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
             ),
             const SizedBox(height: 9),
             const Text(
-              'Only issued cards returned by Klutch appear here.',
+              'Only cards created in Nyxi using Fluz appear here.',
               style: TextStyle(fontSize: 12, color: NyxiPalette.muted),
             ),
           ] else ...[
@@ -593,9 +578,9 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
           _sectionLink('Recent transactions', () => setState(() => _tab = 2)),
           const SizedBox(height: 12),
           if (!account.connected)
-            _emptyText('Connect Klutch to load transaction history.')
+            _emptyText('Connect Fluz to load transaction history.')
           else if (rows.isEmpty)
-            _emptyText('No transactions returned by Klutch.')
+            _emptyText('No transactions returned by Fluz.')
           else
             for (final transaction in rows)
               _transactionRow(transaction),
@@ -604,13 +589,13 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
     );
   }
 
-  Widget _transactionRow(KlutchTransaction transaction) {
-    final isCharge = transaction.type == 'CHARGE';
-    final isRefund = transaction.type == 'REFUND';
-    final isPayment = transaction.type == 'PAYMENT';
+  Widget _transactionRow(FluzTransaction transaction) {
+    final type = transaction.type.toLowerCase();
+    final isCharge = type.contains('purchase') || type.contains('charge');
+    final isRefund = type.contains('refund') || type.contains('reversal');
     final signedAmount = isCharge
         ? -transaction.amount.abs()
-        : (isRefund || isPayment)
+        : isRefund
             ? transaction.amount.abs()
             : transaction.amount;
     return Padding(
@@ -691,7 +676,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    account.connected ? 'Klutch connected' : 'Klutch not connected',
+                    account.connected ? 'Fluz connected' : 'Fluz not connected',
                     style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w700,
                     ),
@@ -703,7 +688,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
             Text(
               account.connected
                   ? 'Data belongs to your signed-in Nyxi account.'
-                  : 'Connect your Klutch credentials to access card activity.',
+                  : 'Connect your Fluz account through secure browser consent to access activity.',
               style: const TextStyle(
                 color: NyxiPalette.muted, fontSize: 11, height: 1.4,
               ),
@@ -719,8 +704,8 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
               padding: EdgeInsets.zero,
               onPressed: () => setState(() => _tab = 1),
               child: Text(account.connected
-                  ? 'Manage Klutch cards'
-                  : 'Connect Klutch'),
+                  ? 'Manage Fluz cards'
+                  : 'Connect Fluz'),
             ),
           ],
         ),
@@ -729,16 +714,16 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
   Widget _cardsView() => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _heading('my cards', 'Your actual cards from Klutch.'),
+          _heading('my cards', 'Only Fluz cards issued via Nyxi are listed.'),
           const SizedBox(height: 21),
-          KlutchCardsPanel(controller: account),
+          FluzCardsPanel(controller: account),
         ],
       );
 
   Widget _activityView() => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _heading('activity', 'Transactions retrieved from Klutch.'),
+          _heading('activity', 'Transactions retrieved from Fluz.'),
           const SizedBox(height: 21),
           if (account.error != null) ...[
             _errorBanner(),
@@ -748,7 +733,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
           const SizedBox(height: 13),
           _panel(
             child: const Text(
-              'Showing up to 30 recent Klutch transactions. '
+              'Showing up to 30 recent Fluz transactions. '
               'This list is not a complete account statement.',
               style: TextStyle(fontSize: 12, color: NyxiPalette.muted),
             ),
@@ -775,20 +760,13 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
                     )),
                 const SizedBox(height: 20),
                 _metricRow(
-                  'Klutch credit balance',
-                  account.creditBalance?.outstandingBalance == null
+                  'Fluz wallet funds',
+                  account.walletBalance?.walletAvailable == null
                       ? 'Not available'
-                      : money(account.creditBalance!.outstandingBalance!),
+                      : money(account.walletBalance!.walletAvailable!),
                 ),
                 const SizedBox(height: 14),
-                _metricRow(
-                  'Credit limit',
-                  account.creditBalance?.creditLimit == null
-                      ? 'Not available'
-                      : money(account.creditBalance!.creditLimit!),
-                ),
-                const SizedBox(height: 14),
-                _metricRow('Klutch cards', account.connected
+                _metricRow('Fluz cards', account.connected
                     ? account.cards.length.toString() : 'Not connected'),
                 const SizedBox(height: 14),
                 _metricRow('Transactions loaded', account.connected
@@ -799,8 +777,8 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
                 _metricRow('Savings account balance', 'Not connected'),
                 const SizedBox(height: 16),
                 const Text(
-                  'Klutch card activity is not a checking or savings account '
-                  'balance. Nyxi does not invent balances or move real money.',
+                  'Fluz wallet funds and virtual cards do not reveal your Chase '
+                  'checking or savings balance. Nyxi does not invent balances.',
                   style: TextStyle(
                     fontSize: 11, height: 1.5, color: NyxiPalette.muted,
                   ),
