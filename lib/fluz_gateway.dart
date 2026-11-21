@@ -153,6 +153,15 @@ class FluzGateway {
     await _request('/api/fluz/connect', method: 'DELETE');
   }
 
+  Future<List<FluzBankAccount>> bankAccounts() async {
+    final json = await _request('/api/fluz/bank-accounts');
+    final items = json['accounts'];
+    return items is List
+      ? items.whereType<Map<String, dynamic>>()
+          .map(FluzBankAccount.fromJson).toList()
+      : <FluzBankAccount>[];
+  }
+
   Future<List<FluzOffer>> offers() async {
     final json = await _request('/api/fluz/offers');
     final items = json['offers'];
@@ -210,16 +219,23 @@ class FluzGateway {
     required double spendLimit,
     required String offerId,
     String period = 'MONTHLY',
+    String fundingSource = 'FLUZ_BALANCE',
+    String? bankAccountId,
   }) async {
     final random = Random.secure();
-    final hex = List<int>.generate(16, (_) => random.nextInt(256))
-        .map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+    // RFC 4122 v4, not merely a 36-character hexadecimal identifier.
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
     final uuid = '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
         '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
         '${hex.substring(20)}';
     final json = await _request('/api/fluz/cards', method: 'POST',
       payload: {'name': name, 'spendLimit': spendLimit, 'offerId': offerId,
-        'period': period, 'fundingSource': 'FLUZ_BALANCE', 'confirm': true},
+        'period': period, 'fundingSource': fundingSource,
+        if (bankAccountId != null) 'bankAccountId': bankAccountId,
+        'confirm': true},
       idempotencyKey: uuid,
     );
     final card = json['card'];
@@ -370,4 +386,21 @@ class FluzOffer {
   );
   final String offerId;
   final String programName;
+}
+
+class FluzBankAccount {
+  const FluzBankAccount({required this.id, required this.type,
+    required this.status, required this.lastFour});
+  factory FluzBankAccount.fromJson(Map<String, dynamic> json) => FluzBankAccount(
+    id: json['id'] is String ? json['id'] as String : '',
+    type: json['type'] is String ? json['type'] as String : '',
+    status: json['status'] is String ? json['status'] as String : '',
+    lastFour: json['lastFour'] is String ? json['lastFour'] as String : '',
+  );
+
+  final String id;
+  final String type;
+  final String status;
+  final String lastFour;
+  String get description => '${type.isEmpty ? 'Bank account' : type} •••• $lastFour';
 }
