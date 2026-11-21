@@ -28,7 +28,22 @@ class KlutchGateway {
   String? _token;
 
   bool get signedIn => _token != null;
+  void clearSession() => _token = null;
   void close() => _client.close(force: true);
+
+  static const _timeout = Duration(seconds: 5);
+
+  /// A backend-specific health check. A random HTTP 200 or captive portal
+  /// must not be mistaken for a responsive Nyxi API.
+  Future<bool> health() async {
+    try {
+      final result = await _request('/health', authenticated: false)
+          .timeout(_timeout);
+      return result['service'] == 'nyxi-api' && result['status'] == 'ok';
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<Map<String, dynamic>> _request(
     String path, {
@@ -37,7 +52,8 @@ class KlutchGateway {
     bool authenticated = true,
     String? idempotencyKey,
   }) async {
-    final request = await _client.openUrl(method, _base.resolve(path));
+    final request = await _client.openUrl(method, _base.resolve(path))
+        .timeout(_timeout);
     request.headers.contentType = ContentType.json;
     request.headers.set(HttpHeaders.cacheControlHeader, 'no-store');
     if (authenticated) {
@@ -48,8 +64,14 @@ class KlutchGateway {
       request.headers.set('Idempotency-Key', idempotencyKey);
     }
     if (payload != null) request.write(jsonEncode(payload));
-    final response = await request.close();
-    final content = await utf8.decoder.bind(response).join();
+    final response = await request.close().timeout(
+      _timeout,
+      onTimeout: () {
+        request.abort();
+        throw const KlutchGatewayException('Nyxi backend timed out.');
+      },
+    );
+    final content = await utf8.decoder.bind(response).join().timeout(_timeout);
     Map<String, dynamic> json;
     try {
       final value = jsonDecode(content);
@@ -62,6 +84,7 @@ class KlutchGateway {
       final reason = json['error'];
       throw KlutchGatewayException(
         reason is String ? reason : 'Backend error ${response.statusCode}',
+        statusCode: response.statusCode,
       );
     }
     return json;
@@ -184,8 +207,9 @@ class NyxiUser {
 }
 
 class KlutchGatewayException implements Exception {
-  const KlutchGatewayException(this.message);
+  const KlutchGatewayException(this.message, {this.statusCode});
   final String message;
+  final int? statusCode;
   @override
   String toString() => message;
 }
