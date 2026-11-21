@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { createFluzService, FluzError } from './fluz.mjs';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -10,36 +11,6 @@ import { promisify } from 'node:util';
 
 const scrypt = promisify(scryptCallback);
 const TTL = 7 * 24 * 60 * 60 * 1000;
-const SESSION_QUERY = `mutation ($clientId: String, $secretKey: String) {
-  createSessionToken(clientId: $clientId, secretKey: $secretKey)
-}`;
-const CARDS_QUERY = `query {
-  cards { id name status lastFour expirationDate media lockState }
-}`;
-const TX_QUERY = `query ($limit: Int, $sortOrder: TransactionSortOrder) {
-  transactionsPaginated(limit: $limit, sortOrder: $sortOrder) {
-    nextCursor
-    list { id merchantName transactionDate amount transactionType transactionStatus card { id } }
-  }
-}`;
-// Klutch's documented Account -> Get Balance request.
-const CREDIT_BALANCE_QUERY = `query {
-  account { revolvingLoan { balance limit } }
-}`;
-// Authoritative month-to-date spending, not a sum of the truncated
-// recent-transactions page. Klutch documents sumTransactions + TransactionFilter.
-const MONTH_SPEND_QUERY = `query($filter: TransactionFilter) {
-  sumTransactions(filter: $filter)
-}`;
-const CREATE_CARD = `mutation ($name: String, $media: CardMedia) {
-  createCard(name: $name, media: $media) {
-    id name status lastFour expirationDate media
-  }
-}`;
-const URLS = Object.freeze({
-  production: 'https://graphql.klutchcard.com/graphql',
-  sandbox: 'https://sandbox.klutchcard.com/graphql',
-});
 const string = (value, limit = 128) => typeof value === 'string' ? value.slice(0, limit) : '';
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const sha = value => createHash('sha256').update(value).digest('hex');
@@ -49,9 +20,6 @@ const emailValid = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.le
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
-}
-class ProviderError extends HttpError {
-  constructor() { super(502, 'Klutch is unavailable or did not accept the request.'); }
 }
 const json = (res, status, data, origin = '') => {
   const body = JSON.stringify(data);
@@ -83,25 +51,6 @@ async function readBody(req) {
   }
 }
 
-function safeCard(value) {
-  const c = object(value);
-  return {
-    id: string(c.id), name: string(c.name), status: string(c.status),
-    lastFour: string(c.lastFour, 4), expirationDate: string(c.expirationDate, 32),
-    media: string(c.media), lockState: string(c.lockState),
-  };
-}
-function safeTransaction(value) {
-  const t = object(value);
-  return {
-    id: string(t.id), merchantName: string(t.merchantName),
-    transactionDate: string(t.transactionDate, 40),
-    amount: typeof t.amount === 'number' && Number.isFinite(t.amount) ? t.amount : 0,
-    transactionType: string(t.transactionType),
-    transactionStatus: string(t.transactionStatus),
-    cardId: string(object(t.card).id),
-  };
-}
 
 export function createNyxiServer({
   env = process.env, fetchImpl = fetch, dbPath, clock = nowMs,
@@ -128,12 +77,6 @@ export function createNyxiServer({
       expires_at INTEGER NOT NULL,
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     );
-    CREATE TABLE IF NOT EXISTS klutch_connections (
-      user_id TEXT PRIMARY KEY, client_enc TEXT NOT NULL,
-      secret_enc TEXT NOT NULL, environment TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
     CREATE TABLE IF NOT EXISTS card_requests (
       user_id TEXT NOT NULL, request_key TEXT NOT NULL,
       created_at INTEGER NOT NULL, state TEXT NOT NULL,
@@ -147,7 +90,7 @@ export function createNyxiServer({
   function encrypt(value, userId) {
     const iv = randomBytes(12);
     const dataKey = Buffer.from(hkdfSync('sha256', masterKey,
-      Buffer.from(userId), Buffer.from('nyxi-klutch-v1'), 32));
+      Buffer.from(userId), Buffer.from('nyxi-fluz-v1'), 32));
     const cipher = createCipheriv('aes-256-gcm', dataKey, iv);
     cipher.setAAD(Buffer.from(userId));
     const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
@@ -158,7 +101,7 @@ export function createNyxiServer({
   function decrypt(value, userId) {
     const [iv, tag, ciphertext] = value.split('.').map(v => Buffer.from(v, 'base64'));
     const dataKey = Buffer.from(hkdfSync('sha256', masterKey,
-      Buffer.from(userId), Buffer.from('nyxi-klutch-v1'), 32));
+      Buffer.from(userId), Buffer.from('nyxi-fluz-v1'), 32));
     try {
       const decipher = createDecipheriv('aes-256-gcm', dataKey, iv);
       decipher.setAAD(Buffer.from(userId));
@@ -194,53 +137,7 @@ export function createNyxiServer({
     if (!user) throw new HttpError(401, 'Session expired or invalid.');
     return user;
   }
-  function connection(userId) {
-    return db.prepare('SELECT * FROM klutch_connections WHERE user_id = ?').get(userId);
-  }
-  async function graphql(environment, query, variables = {}, accessToken = '') {
-    try {
-      const response = await fetchImpl(URLS[environment], {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(accessToken ? { Authorization: 'Bearer ' + accessToken } : {}),
-        },
-        body: JSON.stringify({ query, variables }),
-        signal: AbortSignal.timeout(12000),
-      });
-      if (!response.ok) throw new ProviderError();
-      const payload = await response.json();
-      if (payload.errors?.length || !payload.data) throw new ProviderError();
-      return object(payload.data);
-    } catch {
-      throw new ProviderError();
-    }
-  }
-  const tokenCache = new Map();
-  async function sessionFor(userId, row, force = false) {
-    const cached = tokenCache.get(userId);
-    if (!force && cached && cached.expiresAt > clock()) return cached.token;
-    const clientId = decrypt(row.client_enc, userId);
-    const secretKey = decrypt(row.secret_enc, userId);
-    const data = await graphql(row.environment, SESSION_QUERY, { clientId, secretKey });
-    if (!data.createSessionToken || typeof data.createSessionToken !== 'string') {
-      throw new ProviderError();
-    }
-    const token = data.createSessionToken;
-    tokenCache.set(userId, { token, expiresAt: clock() + 8 * 60 * 1000 });
-    return token;
-  }
-  async function klutchCall(userId, row, query, variables = {}, retryAuth = true) {
-    const token = await sessionFor(userId, row);
-    try {
-      return await graphql(row.environment, query, variables, token);
-    } catch (error) {
-      if (!retryAuth) throw error;
-      tokenCache.delete(userId);
-      const fresh = await sessionFor(userId, row, true);
-      return graphql(row.environment, query, variables, fresh);
-    }
-  }
+  const fluz = createFluzService({ db, env, fetchImpl, clock, encrypt, decrypt });
 
   const ipLimits = new Map();
   function limit(bucket, max, period) {
@@ -323,6 +220,30 @@ export function createNyxiServer({
         }
         return json(res, 200, createSession(user), origin);
       }
+      // The Fluz redirect is public but guarded by a single-use, user-bound
+      // OAuth state stored in SQLite. Do not require a Nyxi bearer token here.
+      if (route === '/api/fluz/callback' && req.method === 'GET') {
+        const code = url.searchParams.get('code') || '';
+        const state = url.searchParams.get('state') || '';
+        await fluz.callback(state, code);
+        const html = '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><h2>Fluz connected to Nyxi</h2><p>Return to Nyxi and press Refresh.</p></body></html>';
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8',
+          'Content-Length': Buffer.byteLength(html), 'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff' });
+        res.end(html); return;
+      }
+      if (route === '/api/fluz/webhook' && req.method === 'POST') {
+        let size = 0;
+        const chunks = [];
+        for await (const chunk of req) {
+          size += chunk.length;
+          if (size > 128 * 1024) throw new HttpError(413, 'Webhook too large.');
+          chunks.push(chunk);
+        }
+        fluz.webhook(Buffer.concat(chunks), req.headers['x-hmac-signature'],
+          req.headers['x-event-id']);
+        return json(res, 200, { received: true }, origin);
+      }
       const user = getUser(req);
       if (route === '/api/auth/me' && req.method === 'GET') {
         return json(res, 200, { user: { id: user.id, email: user.email } }, origin);
@@ -332,158 +253,76 @@ export function createNyxiServer({
           .run(sha(req.headers.authorization.slice(7)));
         return json(res, 200, { signedOut: true }, origin);
       }
-      if (route === '/api/klutch/status' && req.method === 'GET') {
-        const row = connection(user.id);
+      if (route === '/api/fluz/status' && req.method === 'GET') {
+        const row = fluz.connection(user.id);
         return json(res, 200, {
-          connected: Boolean(row),
-          environment: row?.environment || null,
+          connected: Boolean(row), environment: row?.environment || null,
           connectedAt: row?.created_at || null,
         }, origin);
       }
-      if (route === '/api/klutch/connect' && req.method === 'POST') {
-        limit('connect:' + user.id, 8, 60 * 60 * 1000);
-        const body = await readBody(req);
-        const clientId = string(body.clientId, 256).trim();
-        const secretKey = string(body.secretKey, 512);
-        const environment = body.environment === 'sandbox' ? 'sandbox' : 'production';
-        if (clientId.length < 5 || secretKey.length < 8) {
-          throw new HttpError(400, 'Enter your Klutch Client ID and Secret Key.');
-        }
-        const session = await graphql(environment, SESSION_QUERY, { clientId, secretKey });
-        if (!session.createSessionToken || typeof session.createSessionToken !== 'string') {
-          throw new ProviderError();
-        }
-        db.prepare(`INSERT INTO klutch_connections
-          (user_id,client_enc,secret_enc,environment,created_at)
-          VALUES (?,?,?,?,?)
-          ON CONFLICT(user_id) DO UPDATE SET
-          client_enc=excluded.client_enc,secret_enc=excluded.secret_enc,
-          environment=excluded.environment,created_at=excluded.created_at`)
-          .run(user.id, encrypt(clientId, user.id), encrypt(secretKey, user.id), environment, clock());
-        tokenCache.set(user.id, { token: session.createSessionToken, expiresAt: clock() + 8 * 60 * 1000 });
-        return json(res, 200, { connected: true, environment }, origin);
+      if (route === '/api/fluz/authorize' && req.method === 'GET') {
+        limit('oauth:' + user.id, 8, 60 * 60 * 1000);
+        return json(res, 200, { url: fluz.begin(user.id) }, origin);
       }
-      if (route === '/api/klutch/connect' && req.method === 'DELETE') {
-        db.prepare('DELETE FROM klutch_connections WHERE user_id = ?').run(user.id);
-        tokenCache.delete(user.id);
+      if (route === '/api/fluz/connect' && req.method === 'DELETE') {
+        fluz.disconnect(user.id);
         return json(res, 200, { connected: false }, origin);
       }
-      const row = connection(user.id);
-      if (!row) throw new HttpError(409, 'Connect Klutch to your Nyxi account first.');
-      if (route === '/api/klutch/cards' && req.method === 'GET') {
-        const data = await klutchCall(user.id, row, CARDS_QUERY);
-        return json(res, 200, {
-          cards: Array.isArray(data.cards) ? data.cards.map(safeCard) : [],
-        }, origin);
+      const row = fluz.connection(user.id);
+      if (!row) throw new HttpError(409, 'Connect Fluz in Nyxi first.');
+      if (route === '/api/fluz/cards' && req.method === 'GET') {
+        return json(res, 200, { cards: fluz.cards(user.id),
+          scope: 'cards_issued_via_nyxi' }, origin);
       }
-      if (route === '/api/klutch/balance' && req.method === 'GET') {
-        // Some Klutch products have no revolving loan. That must not be
-        // reported as zero debt or as a checking-account cash balance.
-        let outstandingBalance = null;
-        let creditLimit = null;
-        try {
-          const data = await klutchCall(user.id, row, CREDIT_BALANCE_QUERY);
-          const loan = object(object(data.account).revolvingLoan);
-          const finite = value => {
-            if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-            if (typeof value !== 'string') return null;
-            const trimmed = value.trim();
-            if (!/^-?\d+(?:\.\d+)?$/.test(trimmed)) return null;
-            const amount = Number(trimmed);
-            return Number.isFinite(amount) ? amount : null;
-          };
-          outstandingBalance = finite(loan.balance);
-          creditLimit = finite(loan.limit);
-        } catch {
-          // Leave unsupported credit-account values unavailable, not fake.
-        }
-        return json(res, 200, {
-          source: 'klutch', currency: 'USD',
-          accountType: 'revolving_credit',
-          outstandingBalance, creditLimit,
-          available: outstandingBalance !== null || creditLimit !== null,
-        }, origin);
+      if (route === '/api/fluz/transactions' && req.method === 'GET') {
+        return json(res, 200, await fluz.transactions(user.id), origin);
       }
-      if (route === '/api/klutch/insights' && req.method === 'GET') {
-        const now = new Date(clock());
-        const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-        const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-        const period = first.toISOString().slice(0, 7);
-        const filter = {
-          startDate: first.toISOString(),
-          endDate: new Date(next.getTime() - 1).toISOString(),
-          transactionStatus: ['SETTLED'],
-          transactionTypes: ['CHARGE'],
-        };
-        // An unavailable API query is NOT a zero-dollar spending month.
-        let amount = null;
-        try {
-          const data = await klutchCall(user.id, row, MONTH_SPEND_QUERY, { filter });
-          const value = data.sumTransactions;
-          if ((typeof value === 'number' && Number.isFinite(value)) ||
-              (typeof value === 'string' && /^-?\d+(?:\.\d+)?$/.test(value))) {
-            const parsed = Number(value);
-            if (Number.isFinite(parsed)) amount = parsed;
-          }
-        } catch {
-          // The card and transaction panels remain available if this metric
-          // isn't supported by the user's Klutch product.
-        }
-        return json(res, 200, {
-          period, currency: 'USD', settledCharges: amount,
-          source: 'klutch', available: amount !== null,
-        }, origin);
+      if (route === '/api/fluz/events' && req.method === 'GET') {
+        return json(res, 200, { events: fluz.recentEvents(user.id) }, origin);
       }
-      if (route === '/api/klutch/transactions' && req.method === 'GET') {
-        const data = await klutchCall(user.id, row, TX_QUERY, {
-          sortOrder: 'UPDATED_DATE_DESC', limit: 30,
-        });
-        const page = object(data.transactionsPaginated);
-        return json(res, 200, {
-          transactions: Array.isArray(page.list) ? page.list.map(safeTransaction) : [],
-          hasMore: Boolean(page.nextCursor),
-        }, origin);
+      if (route === '/api/fluz/insights' && req.method === 'GET') {
+        return json(res, 200, await fluz.monthly(user.id), origin);
       }
-      if (route === '/api/klutch/cards' && req.method === 'POST') {
+      if (route === '/api/fluz/balance' && req.method === 'GET') {
+        return json(res, 200, await fluz.balance(user.id), origin);
+      }
+      if (route === '/api/fluz/offers' && req.method === 'GET') {
+        return json(res, 200, { offers: await fluz.offers(user.id) }, origin);
+      }
+      if (route === '/api/fluz/wallet-provision' && req.method === 'POST') {
+        const body = await readBody(req);
+        return json(res, 200, await fluz.provisioning(
+          user.id, string(body.offerId), string(body.platform)), origin);
+      }
+      if (route === '/api/fluz/cards' && req.method === 'POST') {
         if (env.NYXI_ENABLE_CARD_ISSUANCE !== 'true') {
-          throw new HttpError(403, 'Live card issuance is disabled on this Nyxi server.');
+          throw new HttpError(403, 'Card issuance is disabled on this Nyxi server.');
         }
         limit('issue:' + user.id, 3, 60 * 60 * 1000);
         const body = await readBody(req);
-        const name = string(body.name, 128).trim();
-        const requestKey = req.headers['idempotency-key'];
-        if (body.confirm !== true || name.length < 2 || name.length > 60 ||
-            typeof requestKey !== 'string' || !/^[0-9a-f-]{16,80}$/i.test(requestKey)) {
-          throw new HttpError(400, 'Confirm a card name and provide a unique Idempotency-Key.');
+        const name = string(body.name, 60).trim();
+        const key = req.headers['idempotency-key'];
+        if (body.confirm !== true || name.length < 2 ||
+            typeof key !== 'string') {
+          throw new HttpError(400, 'Explicitly confirm a card name and unique request ID.');
         }
-        const old = db.prepare(`SELECT state,response FROM card_requests
-          WHERE user_id = ? AND request_key = ?`).get(user.id, requestKey);
-        if (old) {
-          if (old.state === 'complete') return json(res, 200, JSON.parse(old.response), origin);
-          throw new HttpError(409, 'Card request is pending or uncertain. Check Klutch before retrying.');
-        }
-        db.prepare(`INSERT INTO card_requests
-          (user_id,request_key,created_at,state) VALUES (?,?,?,?)`)
-          .run(user.id, requestKey, clock(), 'pending');
-        // Intentionally never automatically retry a financial mutation.
-        const result = await klutchCall(user.id, row, CREATE_CARD,
-          { name, media: 'VIRTUAL' }, false);
-        if (!result.createCard) throw new ProviderError();
-        const response = { card: safeCard(result.createCard) };
-        db.prepare(`UPDATE card_requests SET state = 'complete',response = ?
-          WHERE user_id = ? AND request_key = ?`)
-          .run(JSON.stringify(response), user.id, requestKey);
-        return json(res, 201, response, origin);
+        const result = await fluz.issue(user.id, {
+          name, requestKey: key, offerId: string(body.offerId),
+          spendLimit: body.spendLimit, period: string(body.period),
+          fundingSource: string(body.fundingSource),
+          bankAccountId: string(body.bankAccountId),
+        });
+        return json(res, 201, result, origin);
       }
       throw new HttpError(404, 'Route not found.');
     } catch (error) {
-      return json(res, error instanceof HttpError ? error.status : 500, {
-        error: error instanceof HttpError ? error.message : 'Server error.',
+      return json(res, error instanceof HttpError || error instanceof FluzError ? error.status : 500, {
+        error: error instanceof HttpError || error instanceof FluzError ? error.message : 'Server error.',
       }, origin);
     }
   });
 
-  return { server, db, close() { tokenCache.clear(); db.close(); } };
+  return { server, db, close() { db.close(); } };
 }
 
 if (process.argv[1] && import.meta.url === new URL('file://' + resolve(process.argv[1])).href) {
