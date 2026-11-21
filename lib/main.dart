@@ -269,7 +269,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
                           label: 'Activity',
                         ),
                         GlassTab(
-                          icon: Icon(CupertinoIcons.chart_pie_fill),
+                          icon: Icon(CupertinoIcons.chart_bar_fill),
                           label: 'Insights',
                         ),
                       ],
@@ -580,7 +580,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
             ),
             child: Icon(
               isCharge ? CupertinoIcons.cart_fill
-                  : CupertinoIcons.arrow_down_left,
+                  : CupertinoIcons.arrow_down_circle,
               size: 19,
               color: NyxiPalette.berry,
             ),
