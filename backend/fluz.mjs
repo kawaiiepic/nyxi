@@ -151,6 +151,16 @@ export function createFluzService({ db, env, fetchImpl, clock, encrypt, decrypt 
     }
     const fluzUserId = str(obj(payload.user).id, 128);
     if (!fluzUserId) throw new FluzError(502, 'Fluz authorization did not identify an account holder.');
+    // A Fluz identity must not be mapped to two unrelated Nyxi logins.
+    const existingOwner = db.prepare(
+      'SELECT user_id FROM fluz_connections WHERE fluz_user_id = ? AND user_id <> ?'
+    ).get(fluzUserId, pending.user_id);
+    if (existingOwner) throw new FluzError(409, 'This Fluz account is already connected to another Nyxi account.');
+    const previous = connection(pending.user_id);
+    if (previous && previous.fluz_user_id !== fluzUserId) {
+      db.prepare('DELETE FROM fluz_cards WHERE user_id = ?').run(pending.user_id);
+      db.prepare('DELETE FROM fluz_activity WHERE user_id = ?').run(pending.user_id);
+    }
     const expires = Date.parse(str(payload.accessTokenExpiresAt, 80));
     db.prepare(`INSERT INTO fluz_connections
       (user_id,access_enc,refresh_enc,access_expires_at,fluz_user_id,fluz_account_id,environment,created_at)
@@ -215,13 +225,15 @@ export function createFluzService({ db, env, fetchImpl, clock, encrypt, decrypt 
 
   async function transactions(userId) {
     const pages = [];
+    let hasMore = false;
     for (let offset = 0; offset < 40; offset += 20) {
       const page = await transactionPage(userId, {}, offset);
       const items = Array.isArray(page.transactions) ? page.transactions : [];
       pages.push(...items);
-      if (!page.hasNextPage) break;
+      hasMore = Boolean(page.hasNextPage);
+      if (!hasMore) break;
     }
-    return { transactions: pages.map(safeTransaction), hasMore: pages.length === 40 };
+    return { transactions: pages.map(safeTransaction), hasMore };
   }
 
   async function monthly(userId) {
@@ -329,6 +341,8 @@ export function createFluzService({ db, env, fetchImpl, clock, encrypt, decrypt 
 
   function disconnect(userId) {
     db.prepare('DELETE FROM fluz_connections WHERE user_id=?').run(userId);
+    db.prepare('DELETE FROM fluz_cards WHERE user_id=?').run(userId);
+    db.prepare('DELETE FROM fluz_activity WHERE user_id=?').run(userId);
   }
 
   function webhook(raw, signature, eventId) {
