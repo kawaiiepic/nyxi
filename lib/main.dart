@@ -352,6 +352,8 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
             ],
           ),
         const SizedBox(height: 18),
+        _creditBalancePanel(),
+        const SizedBox(height: 18),
         if (wide)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -452,6 +454,51 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
                   color: NyxiPalette.deepBerry,
                   fontSize: 12,
                 )),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _creditBalancePanel() {
+    final balance = account.creditBalance;
+    return _panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Klutch credit account',
+              style: TextStyle(
+                color: NyxiPalette.ink,
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+              )),
+          const SizedBox(height: 9),
+          const Text(
+            'Real revolving credit figures from Klutch',
+            style: TextStyle(fontSize: 11, color: NyxiPalette.muted),
+          ),
+          const SizedBox(height: 19),
+          _metricRow(
+            'Outstanding credit balance',
+            balance?.outstandingBalance == null
+                ? 'Not available'
+                : money(balance!.outstandingBalance!),
+          ),
+          const SizedBox(height: 13),
+          _metricRow(
+            'Credit limit',
+            balance?.creditLimit == null
+                ? 'Not available'
+                : money(balance!.creditLimit!),
+          ),
+          const SizedBox(height: 11),
+          const Text(
+            'These are credit-card values, not cash in a bank account.',
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.4,
+              color: NyxiPalette.muted,
+            ),
           ),
         ],
       ),
@@ -727,6 +774,20 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
                       color: NyxiPalette.ink,
                     )),
                 const SizedBox(height: 20),
+                _metricRow(
+                  'Klutch credit balance',
+                  account.creditBalance?.outstandingBalance == null
+                      ? 'Not available'
+                      : money(account.creditBalance!.outstandingBalance!),
+                ),
+                const SizedBox(height: 14),
+                _metricRow(
+                  'Credit limit',
+                  account.creditBalance?.creditLimit == null
+                      ? 'Not available'
+                      : money(account.creditBalance!.creditLimit!),
+                ),
+                const SizedBox(height: 14),
                 _metricRow('Klutch cards', account.connected
                     ? account.cards.length.toString() : 'Not connected'),
                 const SizedBox(height: 14),
