@@ -17,8 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Test Klutch gateway
-        run: node --test gateway/server.test.mjs
+      - name: Test central Nyxi API
+        run: node --test backend/server.test.mjs
       - name: Fetch dependencies
         run: flutter pub get
       - name: Analyze Dart source
