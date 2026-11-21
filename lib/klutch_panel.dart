@@ -41,7 +41,9 @@ Map<String, String> parseKlutchKey(String pasted) {
 }
 
 class KlutchController extends ChangeNotifier {
-  final KlutchGateway api = KlutchGateway();
+  KlutchController({KlutchGateway? api}) : api = api ?? KlutchGateway();
+
+  final KlutchGateway api;
   NyxiUser? user;
   List<KlutchCard> cards = const [];
   List<KlutchTransaction> transactions = const [];
@@ -49,8 +51,20 @@ class KlutchController extends ChangeNotifier {
   bool connected = false;
   String? error;
   bool _disposed = false;
-  bool get signedIn => user != null;
+  bool get signedIn => user != null && api.signedIn;
   void _emit() { if (!_disposed) notifyListeners(); }
+
+  /// Immediately discard account access and any visible Klutch data.
+  /// Used when /api/auth/me rejects a previously valid session.
+  void forgetSession() {
+    api.clearSession();
+    user = null;
+    connected = false;
+    cards = const [];
+    transactions = const [];
+    error = null;
+    _emit();
+  }
 
   Future<void> _work(Future<void> Function() task) async {
     if (loading) return;
