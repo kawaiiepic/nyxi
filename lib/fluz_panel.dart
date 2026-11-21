@@ -230,7 +230,7 @@ class FluzCardsPanel extends StatelessWidget {
   Future<void> _addToWallet(BuildContext context, FluzCard card) async {
     try {
       final platform = defaultTargetPlatform == TargetPlatform.android ? 'ANDROID' : 'IOS';
-      final uri = await controller.api.provisioningUrl(card.offerId, platform: platform);
+      final uri = await controller.api.provisioningUrl(card.id, platform: platform);
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
         throw StateError('Unable to launch Fluz wallet provisioning.');
       }
@@ -394,7 +394,7 @@ class FluzCardsPanel extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 9),
                 child: _FluzCardRow(card: card,
-                  onAddToWallet: card.offerId.isEmpty ? null : () => _addToWallet(context, card)),
+                  onAddToWallet: card.status == 'ACTIVE' ? () => _addToWallet(context, card) : null),
               ),
             Wrap(spacing: 12, children: [
               CupertinoButton(
