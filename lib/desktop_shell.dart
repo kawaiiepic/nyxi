@@ -178,7 +178,7 @@ class _DesktopSidebar extends StatelessWidget {
           _DesktopNavItem(
             compact: compact,
             label: 'Insights',
-            icon: CupertinoIcons.heart_fill,
+            icon: CupertinoIcons.chart_bar_fill,
             selected: selectedTab == 3,
             onTap: () => onTabSelected(3),
           ),
@@ -222,7 +222,7 @@ class _DesktopSidebar extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Nyxi preview',
+                          'Nyxi account',
                           style: TextStyle(
                             color: CupertinoColors.white,
                             fontWeight: FontWeight.w600,
@@ -231,7 +231,7 @@ class _DesktopSidebar extends StatelessWidget {
                         ),
                         SizedBox(height: 3),
                         Text(
-                          'Demo account',
+                          'Signed in',
                           style: TextStyle(
                             color: Color(0xFFB19EB3),
                             fontSize: 10,
