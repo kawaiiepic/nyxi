@@ -65,7 +65,7 @@ void main() {
       (tester) async {
     await launchNyxi(tester, windowSize: const Size(390, 844));
     expect(find.text('your money, in focus'), findsOneWidget);
-    expect(find.text('Not available'), findsOneWidget);
+    expect(find.text('Not available'), findsWidgets);
     expect(find.text('No account connected'), findsOneWidget);
     expect(find.text('Verified Merchant'), findsNothing);
     expect(find.textContaining('91.50'), findsNothing);
@@ -80,6 +80,9 @@ void main() {
       tester, linked: true, windowSize: const Size(390, 844),
     );
     expect(find.textContaining('41.75'), findsOneWidget);
+    expect(find.textContaining('77.25'), findsOneWidget);
+    expect(find.textContaining('1,200'), findsNothing);
+    expect(find.textContaining('1200.00'), findsOneWidget);
     expect(find.text('Verified Merchant'), findsOneWidget);
     expect(find.textContaining('6532'), findsOneWidget);
     expect(find.text('Add money'), findsNothing);
