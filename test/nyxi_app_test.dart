@@ -95,7 +95,7 @@ void main() {
       tester, linked: true, windowSize: const Size(1280, 900),
     );
     expect(find.text('your money, in focus'), findsOneWidget);
-    expect(find.text('KLUTCH CONNECTED'), findsOneWidget);
+    expect(find.text('FLUZ CONNECTED'), findsOneWidget);
     expect(find.textContaining('6532'), findsOneWidget);
     expect(find.text('DEMO MODE'), findsNothing);
 
