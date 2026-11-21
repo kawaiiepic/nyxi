@@ -615,7 +615,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
           ),
           const SizedBox(height: 5),
           const Text(
-            'of your \\$200.00 savings goal',
+            'of your \$200.00 savings goal',
             style: TextStyle(
               color: NyxiPalette.muted,
               fontSize: 12,
@@ -834,7 +834,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
           ),
           const SizedBox(height: 7),
           const Text(
-            'of your \\$200.00 goal',
+            'of your \$200.00 goal',
             style: TextStyle(color: NyxiPalette.deepBerry, fontSize: 12),
           ),
           const SizedBox(height: 24),
