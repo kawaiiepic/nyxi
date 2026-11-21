@@ -196,10 +196,15 @@ class _DesktopSidebar extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const CircleAvatar(
-                  radius: 19,
-                  backgroundColor: Color(0xFF55334F),
-                  child: Text(
+                Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF55334F),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Text(
                     'N',
                     style: TextStyle(
                       color: CupertinoColors.white,
@@ -359,7 +364,6 @@ class _DesktopTopBar extends StatelessWidget {
           const SizedBox(width: 15),
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minimumSize: const Size(38, 38),
             onPressed: onScan,
             child: const Icon(
               CupertinoIcons.qrcode,
