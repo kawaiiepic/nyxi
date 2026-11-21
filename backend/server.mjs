@@ -292,7 +292,7 @@ export function createNyxiServer({
       if (route === '/api/fluz/wallet-provision' && req.method === 'POST') {
         const body = await readBody(req);
         return json(res, 200, await fluz.provisioning(
-          user.id, string(body.offerId), string(body.platform)), origin);
+          user.id, string(body.cardId), string(body.platform)), origin);
       }
       if (route === '/api/fluz/cards' && req.method === 'POST') {
         if (env.NYXI_ENABLE_CARD_ISSUANCE !== 'true') {
