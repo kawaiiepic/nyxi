@@ -3,7 +3,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 const str = (v, limit = 180) => typeof v === 'string' ? v.slice(0, limit) : '';
 const obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : {};
 const number = v => {
-  if (typeof v !== 'number' && (typeof v !== 'string' || !/^-?\\d+(?:\\.\\d+)?$/.test(v))) return null;
+  if (typeof v !== 'number' && (typeof v !== 'string' || !/^-?\d+(?:\.\d+)?$/.test(v))) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
@@ -26,8 +26,8 @@ const OFFERS = `query { getVirtualCardOffers {
 const CREATE = `mutation($input:CreateVirtualCardInput!) { createVirtualCard(input:$input) {
   virtualCardId virtualCardLast4 status cardType expiryMonth expiryYear initialAmount createdAt
 } }`;
-const PROVISION = `query($offerId:String!,$platform:ProvisioningPlatform!) {
-  getCardProvisioningUrl(input:{ offerId:$offerId, platform:$platform }) { url expiresAt }
+const PROVISION = `query($virtualCardId:String!,$platform:ProvisioningPlatform!) {
+  getCardProvisioningUrl(input:{ virtualCardId:$virtualCardId, platform:$platform }) { url expiresAt }
 }`;
 
 export class FluzError extends Error {
@@ -312,14 +312,15 @@ export function createFluzService({ db, env, fetchImpl, clock, encrypt, decrypt 
     return response;
   }
 
-  async function provisioning(userId, offerId, platform) {
-    if (!/^[0-9a-f-]{36}$/i.test(offerId) ||
+  async function provisioning(userId, cardId, platform) {
+    if (!/^[0-9a-f-]{36}$/i.test(cardId) ||
         !['IOS','ANDROID'].includes(platform)) throw new FluzError(400, 'Invalid wallet request.');
-    // Only permit offers for cards issued by this Nyxi user.
-    const own = db.prepare('SELECT id FROM fluz_cards WHERE user_id=? AND offer_id=?')
-      .get(userId, offerId);
+    // Using a card ID avoids ambiguous offers when multiple cards share the program.
+    const own = db.prepare('SELECT id,status FROM fluz_cards WHERE user_id=? AND id=?')
+      .get(userId, cardId);
     if (!own) throw new FluzError(404, 'Card not found.');
-    const data = await call(userId, PROVISION, { offerId, platform });
+    if (own.status !== 'ACTIVE') throw new FluzError(409, 'Card is not active for wallet provisioning.');
+    const data = await call(userId, PROVISION, { virtualCardId: cardId, platform });
     const value = obj(data.getCardProvisioningUrl);
     const url = str(value.url, 2048);
     if (!url.startsWith('https://')) throw new FluzError(502, 'Fluz wallet provisioning is unavailable.');
