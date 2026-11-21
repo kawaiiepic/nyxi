@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -41,8 +42,13 @@ Map<String, String> parseKlutchKey(String pasted) {
 }
 
 class KlutchController extends ChangeNotifier {
-  KlutchController({KlutchGateway? api}) : api = api ?? KlutchGateway();
+  KlutchController({KlutchGateway? api}) : api = api ?? KlutchGateway() {
+    _poller = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (signedIn && !loading) refresh();
+    });
+  }
 
+  late final Timer _poller;
   final KlutchGateway api;
   NyxiUser? user;
   List<KlutchCard> cards = const [];
@@ -169,6 +175,7 @@ class KlutchController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _poller.cancel();
     api.close();
     super.dispose();
   }
@@ -270,7 +277,7 @@ class KlutchCardsPanel extends StatelessWidget {
         title: const Text('Issue a real virtual card?'),
         content: Column(children: [
           const SizedBox(height: 10),
-          const Text('This requests a REAL Klutch card, not a demo card.'),
+          const Text('This issues a real Klutch virtual card. Confirm before creating it.'),
           const SizedBox(height: 12),
           CupertinoTextField(
             onChanged: (value) => name = value.trim(),
