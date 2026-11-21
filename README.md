@@ -14,7 +14,7 @@ Nyxi is a cybercute personal finance app using **Flutter, Cupertino, and `liquid
 - Request short-lived **Apple Wallet / Google Pay provisioning links** for a specific card created through Nyxi, if the chosen Fluz card program supports tokenization.
 - Desktop/mobile adaptive design with Liquid Glass. No Material app shell.
 
-**Scope limitations:** The Cards section currently lists **cards issued through Nyxi**, not cards created elsewhere in Fluz. The app does not yet support editing spending limits, linking Chase through Nyxi, or bank-funded card issuance UI. Card issuance is restricted to Fluz-balance funding for now; Fluz's documented bank-account alternative requires a valid linked `bankAccountId`, and card-specific funding/reservation rules must be confirmed. Card balances are **Fluz wallet funds**, not Chase deposits. Signed webhooks appear in the in-app activity feed; true background push notifications on iOS/Android/desktop would require a separate push-delivery integration.
+**Scope limitations:** The Cards section currently lists **cards issued through Nyxi**, not cards created elsewhere in Fluz. The app does not yet support editing spending limits or initiating a new Chase/Plaid bank link from Nyxi. Card issuance can select **Fluz wallet** or an **already-linked bank account** returned by Fluz's `getWallet.bankAccounts` query; bank-account funding requires its `bankAccountId`, and card-specific ACH holds/reservation rules must be confirmed. Card balances are **Fluz wallet funds**, not Chase deposits. Signed webhooks appear in the in-app activity feed; true background push notifications on iOS/Android/desktop would require a separate push-delivery integration.
 
 ## Requirements
 
@@ -76,10 +76,11 @@ For secure development, set a *local loopback* redirect and run a local staging 
 | `POST /api/fluz/webhook` | Public signed webhook receiver |
 | `GET /api/fluz/cards` | Cards issued through Nyxi |
 | `GET /api/fluz/offers` | Card programs eligible for the user |
+| `GET /api/fluz/bank-accounts` | Masked Fluz-linked ACH funding accounts |
 | `POST /api/fluz/cards` | Explicitly confirmed card issuance; **off by default** |
 | `POST /api/fluz/wallet-provision` | Single-card Apple/Google Wallet link |
 
-Issuance is **disabled by default**. The server operator must explicitly set `NYXI_ENABLE_CARD_ISSUANCE=true`, and the user must confirm the card name, offer, funding source and spending limit. A card operation can reserve or charge real money. Nyxi does not automatically retry an uncertain issuance response. Do not enable issuance until the exact Fluz card program and its funding behavior have been tested.
+Issuance is **disabled by default**. The server operator must explicitly set `NYXI_ENABLE_CARD_ISSUANCE=true`, and the user must confirm the card name, offer, funding source and spending limit. For bank-funded cards, use an account previously linked through Fluz's app or Plaid flow; an ACH-backed payment may place a temporary hold on a backup card. A card operation can reserve or charge real money. Nyxi does not automatically retry an uncertain issuance response. Do not enable issuance until the exact Fluz card program and its funding behavior have been tested.
 
 ## Flutter
 
