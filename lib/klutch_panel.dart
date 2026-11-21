@@ -155,7 +155,7 @@ class KlutchCardsPanel extends StatelessWidget {
             ),
             CupertinoDialogAction(
               isDefaultAction: true,
-              onPressed: () => Navigator.of(dialogContext).pop(input.text.trim()),
+              onPressed: () => Navigator.of(dialogContext).pop(input.trim()),
               child: const Text('Issue virtual card'),
             ),
           ],
