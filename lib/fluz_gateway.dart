@@ -27,7 +27,11 @@ class FluzGateway {
   String? _token;
 
   bool get signedIn => _token != null;
-  void clearSession() => _token = null;
+  String? connectionMode;
+  void clearSession() {
+    _token = null;
+    connectionMode = null;
+  }
   void close() => _client.close(force: true);
 
   static const _timeout = Duration(seconds: 5);
@@ -134,6 +138,7 @@ class FluzGateway {
 
   Future<bool> status() async {
     final json = await _request('/api/fluz/status');
+    connectionMode = json['mode'] is String ? json['mode'] as String : null;
     return json['connected'] == true;
   }
 
