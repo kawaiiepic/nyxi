@@ -10,6 +10,7 @@ Future<FakeNyxiGateway> launchNyxi(
   WidgetTester tester, {
   bool signIn = true,
   bool online = true,
+  bool linked = false,
   Size? windowSize,
 }) async {
   if (windowSize != null) {
@@ -19,7 +20,9 @@ Future<FakeNyxiGateway> launchNyxi(
     addTearDown(tester.view.resetDevicePixelRatio);
   }
 
-  final api = FakeNyxiGateway()..online = online;
+  final api = FakeNyxiGateway()
+    ..online = online
+    ..linked = linked;
   final controller = KlutchController(api: api);
   addTearDown(controller.dispose);
   await tester.pumpWidget(
@@ -28,7 +31,6 @@ Future<FakeNyxiGateway> launchNyxi(
   await tester.pumpAndSettle();
 
   if (signIn && online) {
-    expect(find.text('Cash balance'), findsNothing);
     expect(find.text('Sign in to Nyxi'), findsOneWidget);
     await tester.enterText(
       find.byKey(const ValueKey('nyxi-email')),
@@ -53,95 +55,106 @@ void main() {
     );
   });
 
-  testWidgets('no dashboard is mounted until account login succeeds',
-      (tester) async {
+  testWidgets('dashboard requires authenticated Nyxi backend', (tester) async {
     await launchNyxi(tester, signIn: false);
     expect(find.text('Sign in to Nyxi'), findsOneWidget);
-    expect(find.text('Cash balance'), findsNothing);
-    expect(find.text('Your money, at a glance'), findsNothing);
+    expect(find.text('your money, in focus'), findsNothing);
   });
 
-  testWidgets('home displays balance and activity after sign-in',
+  testWidgets('unlinked Nyxi account does not invent balances or cards',
       (tester) async {
     await launchNyxi(tester, windowSize: const Size(390, 844));
-    expect(find.text('Cash balance'), findsOneWidget);
-    expect(find.text('\$91.50'), findsOneWidget);
-    expect(find.text('Add money'), findsOneWidget);
-    expect(find.text('Taco Bell'), findsOneWidget);
+    expect(find.text('your money, in focus'), findsOneWidget);
+    expect(find.text('Not available'), findsOneWidget);
+    expect(find.text('No account connected'), findsOneWidget);
+    expect(find.text('Verified Merchant'), findsNothing);
+    expect(find.textContaining('91.50'), findsNothing);
+    expect(find.textContaining('50.00'), findsNothing);
+    expect(find.text('Add money'), findsNothing);
+    expect(find.text('Withdraw'), findsNothing);
   });
 
-  testWidgets('add money changes demo balance only after sign-in',
+  testWidgets('linked account displays only provider-backed card and spending',
       (tester) async {
-    await launchNyxi(tester, windowSize: const Size(390, 844));
-    await tester.tap(find.text('Add money'));
-    await tester.pumpAndSettle();
-    expect(find.text('Add demo money'), findsOneWidget);
-    await tester.tap(find.text('\$25.00').last);
-    await tester.pumpAndSettle();
-    expect(find.text('\$116.50'), findsOneWidget);
+    await launchNyxi(
+      tester, linked: true, windowSize: const Size(390, 844),
+    );
+    expect(find.textContaining('41.75'), findsOneWidget);
+    expect(find.text('Verified Merchant'), findsOneWidget);
+    expect(find.textContaining('6532'), findsOneWidget);
+    expect(find.text('Add money'), findsNothing);
+    expect(find.text('Withdraw'), findsNothing);
+    expect(find.textContaining('91.50'), findsNothing);
   });
 
-  testWidgets('card navigation requires verified session', (tester) async {
-    await launchNyxi(tester, windowSize: const Size(390, 844));
+  testWidgets('desktop uses provider cards and account status',
+      (tester) async {
+    await launchNyxi(
+      tester, linked: true, windowSize: const Size(1280, 900),
+    );
+    expect(find.text('your money, in focus'), findsOneWidget);
+    expect(find.text('KLUTCH CONNECTED'), findsOneWidget);
+    expect(find.textContaining('6532'), findsOneWidget);
+    expect(find.text('DEMO MODE'), findsNothing);
+
     await tester.tap(find.text('Cards'));
     await tester.pumpAndSettle();
-    expect(find.text('my cards'), findsOneWidget);
-    expect(find.text('Freeze card'), findsOneWidget);
+    expect(find.text('Klutch virtual cards'), findsOneWidget);
+    expect(find.text('Subscriptions'), findsOneWidget);
   });
 
-  testWidgets('wide windows use desktop dashboard only after login',
+  testWidgets('desktop insights do not pretend banking or savings support',
       (tester) async {
-    await launchNyxi(tester, windowSize: const Size(1280, 900));
-    expect(find.text('Your money, at a glance'), findsOneWidget);
-    expect(find.text('DEMO MODE'), findsOneWidget);
-    await tester.tap(find.text('Cards'));
+    await launchNyxi(
+      tester, linked: true, windowSize: const Size(1280, 900),
+    );
+    await tester.tap(find.text('Insights'));
     await tester.pumpAndSettle();
-    expect(find.text('Card controls'), findsOneWidget);
+    expect(find.text('Bank cash balance'), findsOneWidget);
+    expect(find.text('Savings account balance'), findsOneWidget);
+    expect(find.text('Not available'), findsOneWidget);
+    expect(find.text('Not connected'), findsOneWidget);
   });
 
-  testWidgets('phone-sized windows keep mobile look after login',
-      (tester) async {
+  testWidgets('phone-sized windows retain mobile layout', (tester) async {
     await launchNyxi(tester, windowSize: const Size(390, 844));
-    expect(find.text('my money'), findsOneWidget);
-    expect(find.text('Cash balance'), findsOneWidget);
-    expect(find.text('Your money, at a glance'), findsNothing);
+    expect(find.text('nyxi ✦'), findsOneWidget);
+    expect(find.text('your money, in focus'), findsOneWidget);
   });
 
-  testWidgets('unreachable server displays a lock screen, not demo data',
+  testWidgets('unreachable backend always displays lock screen',
       (tester) async {
     final api = await launchNyxi(tester, signIn: false, online: false);
     expect(find.text('Nyxi is locked'), findsOneWidget);
-    expect(find.text('Cash balance'), findsNothing);
+    expect(find.text('your money, in focus'), findsNothing);
 
     api.online = true;
     await tester.tap(find.text('Retry connection'));
     await tester.pumpAndSettle();
     expect(find.text('Sign in to Nyxi'), findsOneWidget);
-    expect(find.text('Cash balance'), findsNothing);
   });
 
-  testWidgets('backend outage locks out a previously signed-in user',
+  testWidgets('an outage removes the live dashboard',
       (tester) async {
     final api = await launchNyxi(tester);
-    expect(find.text('Cash balance'), findsOneWidget);
     api.online = false;
     await tester.pump(const Duration(seconds: 12));
     await tester.pumpAndSettle();
     expect(find.text('Nyxi is locked'), findsOneWidget);
-    expect(find.text('Cash balance'), findsNothing);
+    expect(find.text('your money, in focus'), findsNothing);
   });
 
-  testWidgets('revoked server session removes access after heartbeat',
+  testWidgets('revoked sessions return users to sign-in',
       (tester) async {
     final api = await launchNyxi(tester);
     api.validSession = false;
     await tester.pump(const Duration(seconds: 12));
     await tester.pumpAndSettle();
     expect(find.text('Sign in to Nyxi'), findsOneWidget);
-    expect(find.text('Cash balance'), findsNothing);
+    expect(find.text('your money, in focus'), findsNothing);
   });
 
-  testWidgets('unresponsive backend eventually locks the app',
+  testWidgets('unresponsive server locks the app after timeout',
       (tester) async {
     final api = await launchNyxi(tester);
     api.hangHealth = true;
@@ -149,6 +162,6 @@ void main() {
     await tester.pump(const Duration(seconds: 7));
     await tester.pumpAndSettle();
     expect(find.text('Nyxi is locked'), findsOneWidget);
-    expect(find.text('Cash balance'), findsNothing);
+    expect(find.text('your money, in focus'), findsNothing);
   });
 }
