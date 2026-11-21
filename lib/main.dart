@@ -505,7 +505,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
             const SizedBox(height: 19),
             Text(
               account.connected
-                  ? 'No cards on this account'
+                  ? 'No cards issued through Nyxi yet'
                   : 'No account connected',
               style: const TextStyle(
                 fontSize: 17,
@@ -556,7 +556,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
             ),
             const SizedBox(height: 12),
             Text(
-              '${cards.length} card${cards.length == 1 ? '' : 's'} · ${first.status}',
+              '${cards.length} card${cards.length == 1 ? '' : 's'} · Last known status: ${first.status}',
               style: const TextStyle(
                 color: NyxiPalette.muted,
                 fontSize: 11,
