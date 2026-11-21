@@ -41,6 +41,7 @@ class _NyxiAuthGateState extends State<NyxiAuthGate>
     super.initState();
     _ownsController = widget.controller == null;
     _controller = widget.controller ?? KlutchController();
+    _controller.addListener(_onAccountChanged);
     WidgetsBinding.instance.addObserver(this);
     // Never start in the dashboard, even when the app was hot-restarted.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -50,6 +51,17 @@ class _NyxiAuthGateState extends State<NyxiAuthGate>
       if (mounted && _phase != _GatePhase.authenticating) {
         _verifyBackend();
       }
+    });
+  }
+
+  void _onAccountChanged() {
+    // A sign-out or rejected session must unmount the dashboard immediately.
+    if (!mounted || _phase != _GatePhase.ready || _controller.signedIn) {
+      return;
+    }
+    setState(() => _phase = _GatePhase.checking);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _verifyBackend();
     });
   }
 
@@ -159,6 +171,7 @@ class _NyxiAuthGateState extends State<NyxiAuthGate>
   @override
   void dispose() {
     _heartbeat?.cancel();
+    _controller.removeListener(_onAccountChanged);
     WidgetsBinding.instance.removeObserver(this);
     _email.dispose();
     _password.dispose();
