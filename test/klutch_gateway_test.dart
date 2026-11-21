@@ -33,6 +33,23 @@ void main() {
     expect(transaction.type, 'CHARGE');
   });
 
+  test('unavailable spending remains null rather than a fake zero', () {
+    final unavailable = KlutchMonthlyInsight.fromJson({
+      'period': '2026-11',
+      'currency': 'USD',
+      'available': false,
+      'settledCharges': null,
+    });
+    expect(unavailable.settledCharges, isNull);
+
+    final actual = KlutchMonthlyInsight.fromJson({
+      'period': '2026-11',
+      'currency': 'USD',
+      'settledCharges': 41.75,
+    });
+    expect(actual.settledCharges, 41.75);
+  });
+
   test('Nyxi API only allows HTTPS and private local HTTP', () {
     expect(
       () => KlutchGateway(
