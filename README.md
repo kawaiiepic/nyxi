@@ -51,7 +51,7 @@ Documentation: https://api-docs.klutchcard.com/
    export KLUTCH_SECRET_KEY='your-secret-key'
    export KLUTCH_ENV='production'
    export NYXI_GATEWAY_TOKEN="$(openssl rand -hex 32)"
-   printf 'Nyxi gateway token: %s\\n' "$NYXI_GATEWAY_TOKEN"
+   printf 'Nyxi gateway token: %s\n' "$NYXI_GATEWAY_TOKEN"
    node gateway/server.mjs
    ```
 
