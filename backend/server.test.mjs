@@ -125,7 +125,7 @@ test('Nyxi logins isolate and encrypt each user Klutch connection', async () => 
   assert.equal(spending.body.settledCharges, 41.75);
   assert.equal(spending.body.currency, 'USD');
   assert.equal(spending.body.available, true);
-  assert.match(spending.body.period, /^\\d{4}-\\d{2}$/);
+  assert.match(spending.body.period, /^\d{4}-\d{2}$/);
 
   const issuance = await call('/api/klutch/cards', 'POST', first.body.token, {
     name: 'Subscriptions', confirm: true,
