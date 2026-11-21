@@ -28,8 +28,9 @@ Use the separate backend repository to configure the `.env` secrets, Docker Comp
 - Nyxi requires a valid authenticated central-backend session. No guest, offline, or demo-only access.
 - On startup, and approximately every 12 seconds while the app is ready, it checks `GET /health` and `GET /api/auth/me`. An unresponsive or invalid backend locks the dashboard until authentication and health recover.
 - Sessions are held in memory only. Restarting Nyxi requires signing in again.
-- In **Cards → Connect Fluz**, Nyxi opens Fluz's OAuth authorization page. The backend handles the code/state callback, stores encrypted tokens, and connects the correct Nyxi account. Return to Nyxi and press **Refresh** once Fluz authorizes.
-- An approved Fluz OAuth Integration application is needed to connect distinct users. The backend is not yet verified with live Fluz credentials or approved card programs.
+- **OAuth mode:** In **Cards → Connect Fluz**, Nyxi opens Fluz's authorization page. The backend handles the callback, stores encrypted tokens, and connects the correct Nyxi account.
+- **Single-account API-key mode:** Set `FLUZ_AUTH_MODE=api_key`, `FLUZ_API_KEY`, `FLUZ_USER_ID`, `FLUZ_ACCOUNT_ID`, and `NYXI_FLUZ_OWNER_USER_ID` in the [backend's private `.env`](https://github.com/kawaiiepic/nyxi-backend/blob/main/.env.example). The designated Nyxi login automatically shows Fluz as server-managed, without an OAuth popup. The key is **never entered in Flutter** and is not shared with other Nyxi accounts. See the [backend API-key setup guide](https://github.com/kawaiiepic/nyxi-backend#personal-fluz-api-key-mode-no-oauth-client-id-needed).
+- An approved Fluz OAuth Integration application is still needed to connect *distinct users*. Live API-key mode may also be restricted if Fluz hasn't activated your developer application. The backend is not yet verified with live credentials or card programs.
 
 ## Live financial data
 
