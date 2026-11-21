@@ -38,4 +38,33 @@ void main() {
     expect(find.text('my cards'), findsOneWidget);
     expect(find.text('Freeze card'), findsOneWidget);
   });
+
+  testWidgets('wide layouts use the desktop dashboard', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(LiquidGlassWidgets.wrap(child: const NyxiApp()));
+    expect(find.text('Your money, at a glance'), findsOneWidget);
+    expect(find.text('DEMO MODE'), findsOneWidget);
+    expect(find.text('Your virtual card'), findsOneWidget);
+
+    await tester.tap(find.text('Cards'));
+    await tester.pumpAndSettle();
+    expect(find.text('my cards'), findsOneWidget);
+    expect(find.text('Card controls'), findsOneWidget);
+  });
+
+  testWidgets('narrow layouts preserve the mobile experience', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(LiquidGlassWidgets.wrap(child: const NyxiApp()));
+    expect(find.text('my money'), findsOneWidget);
+    expect(find.text('Cash balance'), findsOneWidget);
+    expect(find.text('Your money, at a glance'), findsNothing);
+  });
 }
