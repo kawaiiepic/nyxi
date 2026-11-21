@@ -14,6 +14,8 @@ const provider = async (_url, options) => {
   let data;
   if (query.includes('createSessionToken')) {
     data = { createSessionToken: 'session-' + variables.clientId };
+  } else if (query.includes('revolvingLoan')) {
+    data = { account: { revolvingLoan: { balance: 77.25, limit: 1200 } } };
   } else if (query.includes('sumTransactions')) {
     assert.deepEqual(variables.filter.transactionStatus, ['SETTLED']);
     assert.deepEqual(variables.filter.transactionTypes, ['CHARGE']);
@@ -126,6 +128,13 @@ test('Nyxi logins isolate and encrypt each user Klutch connection', async () => 
   assert.equal(spending.body.currency, 'USD');
   assert.equal(spending.body.available, true);
   assert.match(spending.body.period, /^\d{4}-\d{2}$/);
+
+  const credit = await call('/api/klutch/balance', 'GET', first.body.token);
+  assert.equal(credit.status, 200);
+  assert.equal(credit.body.outstandingBalance, 77.25);
+  assert.equal(credit.body.creditLimit, 1200);
+  assert.equal(credit.body.accountType, 'revolving_credit');
+  assert.equal(credit.body.available, true);
 
   const issuance = await call('/api/klutch/cards', 'POST', first.body.token, {
     name: 'Subscriptions', confirm: true,
