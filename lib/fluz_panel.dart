@@ -410,7 +410,7 @@ class FluzCardsPanel extends StatelessWidget {
             ]),
           ] else ...[
             const SizedBox(height: 14),
-            const Text('LIVE · Your Fluz account',
+            const Text('CONNECTED · Fluz cards issued through Nyxi',
                 style: TextStyle(fontSize: 11, color: Color(0xFFB51B7C))),
             if (controller.cards.isEmpty)
               const Text('No cards issued through Nyxi yet.'),
@@ -437,7 +437,7 @@ class FluzCardsPanel extends StatelessWidget {
                 child: const Text('Sign out'),
               ),
             ]),
-            const Text('Only cards issued through Nyxi are listed. Full card numbers are unavailable.',
+            const Text('Card status is last known at issuance, not live-verified. Full card numbers are unavailable.',
                 style: TextStyle(fontSize: 11, color: Color(0xFF9D97A1))),
           ],
         ],
