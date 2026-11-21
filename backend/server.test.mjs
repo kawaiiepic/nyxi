@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -14,6 +14,11 @@ const provider = async (_url, options) => {
   let data;
   if (query.includes('createSessionToken')) {
     data = { createSessionToken: 'session-' + variables.clientId };
+  } else if (query.includes('sumTransactions')) {
+    assert.deepEqual(variables.filter.transactionStatus, ['SETTLED']);
+    assert.deepEqual(variables.filter.transactionTypes, ['CHARGE']);
+    assert.equal(typeof variables.filter.startDate, 'string');
+    data = { sumTransactions: 41.75 };
   } else if (query.includes('transactionsPaginated')) {
     data = { transactionsPaginated: { nextCursor: null, list: [
       { id: 'tx1', merchantName: 'Cafe', transactionDate: '2026-11-20',
@@ -112,6 +117,15 @@ test('Nyxi logins isolate and encrypt each user Klutch connection', async () => 
   assert.equal(tx.status, 200);
   assert.equal(tx.body.transactions[0].merchantName, 'Cafe');
   assert.equal(tx.body.transactions[0].unneededSecret, undefined);
+
+  const anonymousInsights = await call('/api/klutch/insights');
+  assert.equal(anonymousInsights.status, 401);
+  const spending = await call('/api/klutch/insights', 'GET', first.body.token);
+  assert.equal(spending.status, 200);
+  assert.equal(spending.body.settledCharges, 41.75);
+  assert.equal(spending.body.currency, 'USD');
+  assert.equal(spending.body.available, true);
+  assert.match(spending.body.period, /^\\d{4}-\\d{2}$/);
 
   const issuance = await call('/api/klutch/cards', 'POST', first.body.token, {
     name: 'Subscriptions', confirm: true,
