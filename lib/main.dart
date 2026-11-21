@@ -80,7 +80,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
               selectedTab: _tab,
               title: _tabs[_tab],
               statusLabel: account.connected
-                  ? 'KLUTCH CONNECTED'
+                  ? 'FLUZ CONNECTED'
                   : 'NO FLUZ CONNECTION',
               onTabSelected: (index) => setState(() => _tab = index),
               onOpenSettings: _openSettings,
