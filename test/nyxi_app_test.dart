@@ -63,7 +63,7 @@ void main() {
 
   testWidgets('home displays balance and activity after sign-in',
       (tester) async {
-    await launchNyxi(tester);
+    await launchNyxi(tester, windowSize: const Size(390, 844));
     expect(find.text('Cash balance'), findsOneWidget);
     expect(find.text('\$91.50'), findsOneWidget);
     expect(find.text('Add money'), findsOneWidget);
@@ -72,7 +72,7 @@ void main() {
 
   testWidgets('add money changes demo balance only after sign-in',
       (tester) async {
-    await launchNyxi(tester);
+    await launchNyxi(tester, windowSize: const Size(390, 844));
     await tester.tap(find.text('Add money'));
     await tester.pumpAndSettle();
     expect(find.text('Add demo money'), findsOneWidget);
@@ -82,7 +82,7 @@ void main() {
   });
 
   testWidgets('card navigation requires verified session', (tester) async {
-    await launchNyxi(tester);
+    await launchNyxi(tester, windowSize: const Size(390, 844));
     await tester.tap(find.text('Cards'));
     await tester.pumpAndSettle();
     expect(find.text('my cards'), findsOneWidget);
