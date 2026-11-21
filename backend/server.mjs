@@ -389,7 +389,7 @@ export function createNyxiServer({
           const data = await klutchCall(user.id, row, MONTH_SPEND_QUERY, { filter });
           const value = data.sumTransactions;
           if ((typeof value === 'number' && Number.isFinite(value)) ||
-              (typeof value === 'string' && /^-?\d+(?:\\.\d+)?$/.test(value))) {
+              (typeof value === 'string' && /^-?\d+(?:\.\d+)?$/.test(value))) {
             const parsed = Number(value);
             if (Number.isFinite(parsed)) amount = parsed;
           }
