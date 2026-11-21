@@ -9,7 +9,8 @@ class NyxiDesktopShell extends StatelessWidget {
     required this.selectedTab,
     required this.onTabSelected,
     required this.onOpenSettings,
-    required this.onScan,
+    required this.onRefresh,
+    required this.statusLabel,
     required this.title,
     required this.child,
   });
@@ -17,7 +18,8 @@ class NyxiDesktopShell extends StatelessWidget {
   final int selectedTab;
   final ValueChanged<int> onTabSelected;
   final VoidCallback onOpenSettings;
-  final VoidCallback onScan;
+  final VoidCallback onRefresh;
+  final String statusLabel;
   final String title;
   final Widget child;
 
@@ -46,7 +48,8 @@ class NyxiDesktopShell extends StatelessWidget {
                         _DesktopTopBar(
                           title: title,
                           compact: compact,
-                          onScan: onScan,
+                          onRefresh: onRefresh,
+                          statusLabel: statusLabel,
                         ),
                         Expanded(
                           child: SingleChildScrollView(
@@ -174,7 +177,7 @@ class _DesktopSidebar extends StatelessWidget {
           ),
           _DesktopNavItem(
             compact: compact,
-            label: 'Savings',
+            label: 'Insights',
             icon: CupertinoIcons.heart_fill,
             selected: selectedTab == 3,
             onTap: () => onTabSelected(3),
@@ -314,12 +317,14 @@ class _DesktopTopBar extends StatelessWidget {
   const _DesktopTopBar({
     required this.title,
     required this.compact,
-    required this.onScan,
+    required this.onRefresh,
+    required this.statusLabel,
   });
 
   final String title;
   final bool compact;
-  final VoidCallback onScan;
+  final VoidCallback onRefresh;
+  final String statusLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -352,7 +357,7 @@ class _DesktopTopBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(99),
             ),
             child: const Text(
-              'DEMO MODE',
+              statusLabel,
               style: TextStyle(
                 color: Color(0xFFA92079),
                 fontWeight: FontWeight.w700,
@@ -364,9 +369,9 @@ class _DesktopTopBar extends StatelessWidget {
           const SizedBox(width: 15),
           CupertinoButton(
             padding: EdgeInsets.zero,
-            onPressed: onScan,
+            onPressed: onRefresh,
             child: const Icon(
-              CupertinoIcons.qrcode,
+              CupertinoIcons.refresh,
               color: Color(0xFF473B4A),
               size: 22,
             ),
