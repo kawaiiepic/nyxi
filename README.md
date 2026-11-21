@@ -2,7 +2,7 @@
 
 A cybercute personal-finance app built with Flutter.
 
-Nyxi starts with a polished, interactive demo home screen inspired by the supplied pink money-app reference. The initial cash and savings amounts are **demo data**; Klutch card data is optional and account-linked.
+Nyxi is an authenticated desktop-and-mobile personal-finance dashboard. It retrieves actual virtual cards, transactions and month-to-date settled card charges through the central Nyxi API. It never invents bank balances or savings funds.
 
 ## Run
 
@@ -26,8 +26,8 @@ The Flutter platform runner directories are intentionally generated locally. The
 - The desktop view deliberately uses a neutral canvas instead of the
   full-window pink/green preview backdrop. Liquid Glass stays enabled for
   navigation, buttons, and cards.
-- All views share one in-memory demo state, so balances and card controls
-  survive resizing, but reset when the app restarts.
+- All layouts share the same authenticated Nyxi API account and returned provider
+  records. Account access is locked when Nyxi's backend is unreachable.
 
 ## Mandatory online sign-in
 
@@ -41,7 +41,7 @@ The app checks backend availability and session validity every **12 seconds**,
 and verifies again when resumed from the background. If the backend is
 unreachable, times out, returns an invalid health response or rejects the
 current session, the dashboard is immediately replaced by a lock/sign-in
-screen. The UI **never** falls back to sample financial data on failure.
+screen. The UI **never** falls back to fabricated financial data on failure.
 The lock screen offers Retry, and it periodically rechecks automatically.
 
 The health request has a five-second HTTP timeout and the gate limits each
@@ -51,6 +51,34 @@ Nyxi always requires signing in because access tokens are not persisted.
 
 To test these behaviors, run `flutter test test/nyxi_app_test.dart`.
 The tests use a simulated Nyxi backend and do not require live Klutch keys.
+
+## Live financial data only
+
+Nyxi no longer contains mock balances, sample merchants, simulated deposits,
+withdrawals or a fake virtual card. The mobile and desktop Home screens display
+real data returned for the signed-in user:
+
+- **Monthly settled card charges**: computed by Klutch's
+  `sumTransactions(filter: ...)` GraphQL query for settled `CHARGE`
+  transactions within the current UTC month, served through
+  `GET /api/klutch/insights`. If unavailable, Nyxi shows **Not available**
+  instead of a made-up amount or zero.
+- **Virtual cards**: fetched via `GET /api/klutch/cards`; only the masked
+  last four digits, name and status are rendered. An unlinked account gets an
+  empty state and an option to connect Klutch.
+- **Recent activity**: fetched via `GET /api/klutch/transactions`; the
+  list is explicitly limited to the first 30 records and is not a complete
+  account statement.
+- **Insights tab**: replaces the former fictional Savings tab. It displays
+  the verified spending metric, number of cards and loaded transactions.
+  A cash/bank account balance or savings balance is clearly marked
+  unavailable until an actual banking data provider supports those values.
+
+The former Add money, Withdraw, Move to savings, Move to cash and demo card
+freeze controls were removed. Nyxi cannot make cash transfers or represent
+an unrelated Klutch credit-card balance as bank deposits. Real virtual-card
+issuance uses the Klutch backend integration and remains disabled by default
+until the server operator explicitly enables it.
 
 ## Nyxi accounts and Klutch integration
 
@@ -126,9 +154,8 @@ Documentation: https://api-docs.klutchcard.com/
 - User sessions are currently held **only in Flutter memory**. After
   restarting the app, users sign in again; the encrypted Klutch
   connection remains linked to their Nyxi account.
-- Only the first 30 transactions are shown. Demo money and frozen demo
-  cards remain independent of Klutch. Full card numbers, CVV, and live
-  card locking are not requested or implemented.
+- Only the first 30 transactions are shown. Full card numbers, CVV, bank
+  account transfers and live card locking are not requested or implemented.
 - For API tests with a mock Klutch provider, run
   `node --test backend/server.test.mjs`. No real card is issued by tests.
 
