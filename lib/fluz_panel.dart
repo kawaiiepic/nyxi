@@ -28,6 +28,7 @@ class FluzController extends ChangeNotifier {
   String? error;
   bool _disposed = false;
   bool get signedIn => user != null && api.signedIn;
+  bool get serverManagedFluz => api.connectionMode == 'api_key';
   void _emit() { if (!_disposed) notifyListeners(); }
 
   /// Immediately discard account access and any visible Fluz data.
@@ -410,8 +411,10 @@ class FluzCardsPanel extends StatelessWidget {
             ]),
           ] else ...[
             const SizedBox(height: 14),
-            const Text('CONNECTED · Fluz cards issued through Nyxi',
-                style: TextStyle(fontSize: 11, color: Color(0xFFB51B7C))),
+            Text(controller.serverManagedFluz
+                ? 'API KEY CONNECTED · Managed by your Nyxi server'
+                : 'CONNECTED · Fluz cards issued through Nyxi',
+                style: const TextStyle(fontSize: 11, color: Color(0xFFB51B7C))),
             if (controller.cards.isEmpty)
               const Text('No cards issued through Nyxi yet.'),
             for (final card in controller.cards)
@@ -426,11 +429,12 @@ class FluzCardsPanel extends StatelessWidget {
                 onPressed: controller.loading ? null : () => _createCard(context),
                 child: const Text('Create virtual card'),
               ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: controller.loading ? null : controller.disconnect,
-                child: const Text('Unlink Fluz'),
-              ),
+              if (!controller.serverManagedFluz)
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: controller.loading ? null : controller.disconnect,
+                  child: const Text('Unlink Fluz'),
+                ),
               CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: controller.loading ? null : controller.logout,
