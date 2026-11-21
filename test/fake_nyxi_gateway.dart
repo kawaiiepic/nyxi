@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:nyxi/klutch_gateway.dart';
+import 'package:nyxi/fluz_gateway.dart';
 
 /// In-memory network substitute for the Nyxi gate widget tests.
-class FakeNyxiGateway extends KlutchGateway {
+class FakeNyxiGateway extends FluzGateway {
   FakeNyxiGateway() : super(baseUrl: 'http://127.0.0.1:8787');
 
   bool online = true;
@@ -29,9 +29,9 @@ class FakeNyxiGateway extends KlutchGateway {
 
   @override
   Future<NyxiUser> login(String email, String password) async {
-    if (!online) throw const KlutchGatewayException('Backend unreachable.');
+    if (!online) throw const FluzGatewayException('Backend unreachable.');
     if (email != account.email || password.isEmpty) {
-      throw const KlutchGatewayException(
+      throw const FluzGatewayException(
         'Invalid email or password.',
         statusCode: 401,
       );
@@ -46,9 +46,9 @@ class FakeNyxiGateway extends KlutchGateway {
 
   @override
   Future<NyxiUser> me() async {
-    if (!online) throw const KlutchGatewayException('Backend unreachable.');
+    if (!online) throw const FluzGatewayException('Backend unreachable.');
     if (!validSession) {
-      throw const KlutchGatewayException('Unauthorized.', statusCode: 401);
+      throw const FluzGatewayException('Unauthorized.', statusCode: 401);
     }
     return account;
   }
@@ -57,9 +57,9 @@ class FakeNyxiGateway extends KlutchGateway {
   Future<bool> status() async => linked;
 
   @override
-  Future<List<KlutchCard>> cards() async => linked
+  Future<List<FluzCard>> cards() async => linked
       ? const [
-          KlutchCard(
+          FluzCard(
             id: 'card-real-test',
             name: 'Subscriptions',
             lastFour: '6532',
@@ -69,39 +69,38 @@ class FakeNyxiGateway extends KlutchGateway {
             expirationDate: '2028-12',
           ),
         ]
-      : const <KlutchCard>[];
+      : const <FluzCard>[];
 
   @override
-  Future<List<KlutchTransaction>> transactions() async => linked
+  Future<List<FluzTransaction>> transactions() async => linked
       ? const [
-          KlutchTransaction(
+          FluzTransaction(
             id: 'transaction-real-test',
             merchantName: 'Verified Merchant',
             date: '2026-11-20',
-            amount: 13.75,
+            amount: -13.75,
             status: 'SETTLED',
-            type: 'CHARGE',
+            type: 'Virtual Card Purchase',
             cardId: 'card-real-test',
           ),
         ]
-      : const <KlutchTransaction>[];
+      : const <FluzTransaction>[];
 
   @override
-  Future<KlutchCreditBalance> creditBalance() async =>
-      linked
-          ? const KlutchCreditBalance(
-              outstandingBalance: 77.25,
-              creditLimit: 1200.00,
-            )
-          : const KlutchCreditBalance();
+  Future<FluzWalletBalance> walletBalance() async =>
+      linked ? const FluzWalletBalance(walletAvailable: 77.25)
+          : const FluzWalletBalance();
 
   @override
-  Future<KlutchMonthlyInsight> monthlyInsight() async =>
-      const KlutchMonthlyInsight(
+  Future<FluzMonthlyInsight> monthlyInsight() async =>
+      const FluzMonthlyInsight(
         period: '2026-11',
         currency: 'USD',
         settledCharges: 41.75,
       );
+
+  @override
+  Future<List<FluzTransaction>> events() async => const [];
 
   @override
   Future<void> logout() async => validSession = false;
