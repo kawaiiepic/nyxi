@@ -16,10 +16,10 @@ The public [Nyxi landing page](https://nyxi.blossomvale.dev/) is served separate
 ```bash
 flutter create --platforms=android,ios,linux,windows .
 flutter pub get
-flutter run -d linux --dart-define=NYXI_API_URL=https://nyxi.blossomvale.dev
+flutter run -d linux
 ```
 
-Flutter 3.41+ is required. Platform runner directories are generated locally. Your backend must be reachable via **HTTPS** from the device. For development only, Nyxi also allows `localhost`, `127.0.0.1`, and Android emulator `10.0.2.2` over plain HTTP. Android/iOS devices cannot use the Linux desktop's `127.0.0.1`; use your backend HTTPS hostname.
+Flutter 3.41+ is required. Platform runner directories are generated locally. The API origin is hardcoded in `lib/fluz_gateway.dart` to **`https://nyxi.blossomvale.dev`** on all platforms; no `--dart-define` is needed. Your backend must be reachable via **HTTPS** from the device. For development only, Nyxi also allows `localhost`, `127.0.0.1`, and Android emulator `10.0.2.2` over plain HTTP. Android/iOS devices cannot use the Linux desktop's `127.0.0.1`; use your backend HTTPS hostname.
 
 Use the separate backend repository to configure the `.env` secrets, Docker Compose service, HTTPS proxy, Fluz OAuth callback, and transaction webhooks.
 
