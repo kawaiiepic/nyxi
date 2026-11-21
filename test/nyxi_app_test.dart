@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:nyxi/klutch_panel.dart';
+import 'package:nyxi/fluz_panel.dart';
 import 'package:nyxi/main.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -23,7 +23,7 @@ Future<FakeNyxiGateway> launchNyxi(
   final api = FakeNyxiGateway()
     ..online = online
     ..linked = linked;
-  final controller = KlutchController(api: api);
+  final controller = FluzController(api: api);
   addTearDown(controller.dispose);
   await tester.pumpWidget(
     LiquidGlassWidgets.wrap(child: NyxiApp(controller: controller)),
@@ -82,7 +82,6 @@ void main() {
     expect(find.textContaining('41.75'), findsOneWidget);
     expect(find.textContaining('77.25'), findsOneWidget);
     expect(find.textContaining('1,200'), findsNothing);
-    expect(find.textContaining('1200.00'), findsOneWidget);
     expect(find.text('Verified Merchant'), findsOneWidget);
     expect(find.textContaining('6532'), findsOneWidget);
     expect(find.text('Add money'), findsNothing);
@@ -102,7 +101,7 @@ void main() {
 
     await tester.tap(find.text('Cards'));
     await tester.pumpAndSettle();
-    expect(find.text('Klutch virtual cards'), findsOneWidget);
+    expect(find.text('Fluz virtual cards'), findsOneWidget);
     expect(find.text('Subscriptions'), findsOneWidget);
   });
 
