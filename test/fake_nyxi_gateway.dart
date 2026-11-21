@@ -87,6 +87,15 @@ class FakeNyxiGateway extends KlutchGateway {
       : const <KlutchTransaction>[];
 
   @override
+  Future<KlutchCreditBalance> creditBalance() async =>
+      linked
+          ? const KlutchCreditBalance(
+              outstandingBalance: 77.25,
+              creditLimit: 1200.00,
+            )
+          : const KlutchCreditBalance();
+
+  @override
   Future<KlutchMonthlyInsight> monthlyInsight() async =>
       const KlutchMonthlyInsight(
         period: '2026-11',
