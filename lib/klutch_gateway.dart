@@ -175,6 +175,11 @@ class KlutchGateway {
         : <KlutchTransaction>[];
   }
 
+  Future<KlutchCreditBalance> creditBalance() async {
+    final json = await _request('/api/klutch/balance');
+    return KlutchCreditBalance.fromJson(json);
+  }
+
   Future<KlutchMonthlyInsight> monthlyInsight() async {
     final json = await _request('/api/klutch/insights');
     return KlutchMonthlyInsight.fromJson(json);
@@ -313,4 +318,23 @@ class KlutchMonthlyInsight {
   final String currency;
   /// Null means data is unavailable. Never replace null with a fake zero.
   final double? settledCharges;
+}
+
+class KlutchCreditBalance {
+  const KlutchCreditBalance({this.outstandingBalance, this.creditLimit});
+
+  factory KlutchCreditBalance.fromJson(Map<String, dynamic> json) {
+    final balance = json['outstandingBalance'];
+    final limit = json['creditLimit'];
+    return KlutchCreditBalance(
+      outstandingBalance: balance is num && balance.isFinite
+          ? balance.toDouble() : null,
+      creditLimit: limit is num && limit.isFinite
+          ? limit.toDouble() : null,
+    );
+  }
+
+  /// Revolving credit account debt, not cash held in a checking account.
+  final double? outstandingBalance;
+  final double? creditLimit;
 }
