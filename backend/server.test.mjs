@@ -49,7 +49,8 @@ const provider = async (endpoint, options) => {
       cashBalance: { availableBalance: '72.25' },
       rewardsBalance: { availableBalance: '5.00' },
       giftCardCashBalance: { availableBalance: '0.00' },
-    } } };
+    }, bankAccounts: [{ bankAccountId: '123e4567-e89b-42d3-a456-426614174000',
+      type: 'CHECKING', status: 'ACTIVE', lastFour: '4321' }] } };
   } else if (query.includes('getTransactions')) {
     data = { getTransactions: {
       transactions: [{
@@ -150,6 +151,11 @@ test('Nyxi user login, Fluz consent and encrypted connection remain isolated', a
   const insights = await call('/api/fluz/insights', 'GET', first.body.token);
   assert.equal(insights.body.settledCharges, 12.5);
   assert.match(insights.body.period, /^\d{4}-\d{2}$/);
+  const banks = await call('/api/fluz/bank-accounts', 'GET', first.body.token);
+  assert.equal(banks.status, 200);
+  assert.equal(banks.body.accounts[0].lastFour, '4321');
+  assert.equal(banks.body.accounts[0].id, '123e4567-e89b-42d3-a456-426614174000');
+  assert.equal(banks.body.accounts[0].routingNumber, undefined);
   const offers = await call('/api/fluz/offers', 'GET', first.body.token);
   assert.equal(offers.body.offers[0].offerId, offerId);
   assert.equal((await call('/api/fluz/cards', 'POST', first.body.token, {
