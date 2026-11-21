@@ -33,16 +33,14 @@ void main() {
     expect(transaction.type, 'CHARGE');
   });
 
-  test('gateway only allows HTTPS and private local HTTP', () {
+  test('Nyxi API only allows HTTPS and private local HTTP', () {
     expect(
       () => KlutchGateway(
-        accessToken: 'test-only',
         baseUrl: 'http://example.com:8787',
       ),
       throwsArgumentError,
     );
     final gateway = KlutchGateway(
-      accessToken: 'test-only',
       baseUrl: 'http://127.0.0.1:8787',
     );
     gateway.close();
