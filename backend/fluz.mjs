@@ -19,6 +19,9 @@ const WALLET = `query { getWallet { balances {
   rewardsBalance { availableBalance }
   giftCardCashBalance { availableBalance }
 } } }`;
+const BANK_ACCOUNTS = `query { getWallet { bankAccounts {
+  bankAccountId type status lastFour
+} } }`;
 const OFFERS = `query { getVirtualCardOffers {
   offerId programName bankName rewardValue
   programLimits { dailyLimit weeklyLimit monthlyLimit }
@@ -280,6 +283,15 @@ export function createFluzService({ db, env, fetchImpl, clock, encrypt, decrypt 
       }));
   }
 
+  async function bankAccounts(userId) {
+    const result = await call(userId, BANK_ACCOUNTS);
+    const accounts = obj(result.getWallet).bankAccounts;
+    return (Array.isArray(accounts) ? accounts : []).map(a => ({
+      id: str(a.bankAccountId, 64), type: str(a.type, 32),
+      status: str(a.status, 32), lastFour: str(a.lastFour, 4),
+    })).filter(a => a.id);
+  }
+
   async function offers(userId) {
     const data = await call(userId, OFFERS);
     return (Array.isArray(data.getVirtualCardOffers) ? data.getVirtualCardOffers : [])
@@ -296,6 +308,12 @@ export function createFluzService({ db, env, fetchImpl, clock, encrypt, decrypt 
         !['FLUZ_BALANCE','BANK_ACCOUNT'].includes(fundingSource) ||
         (fundingSource === 'BANK_ACCOUNT' && !/^[a-f0-9-]{36}$/i.test(bankAccountId || ''))) {
       throw new FluzError(400, 'Choose an eligible offer, valid spending limit, and funding source.');
+    }
+    if (fundingSource === 'BANK_ACCOUNT') {
+      const verified = await bankAccounts(userId);
+      if (!verified.some(account => account.id === bankAccountId)) {
+        throw new FluzError(400, 'Choose a bank account already linked to your Fluz account.');
+      }
     }
     const existing = db.prepare('SELECT state,response FROM card_requests WHERE user_id=? AND request_key=?')
       .get(userId, requestKey);
@@ -403,6 +421,6 @@ export function createFluzService({ db, env, fetchImpl, clock, encrypt, decrypt 
     }));
   }
 
-  return { begin, callback, connection, disconnect, cards, offers, issue,
+  return { begin, callback, connection, disconnect, cards, offers, bankAccounts, issue,
     transactions, monthly, balance, provisioning, webhook, recentEvents };
 }
