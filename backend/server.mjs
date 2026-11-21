@@ -22,6 +22,11 @@ const TX_QUERY = `query ($limit: Int, $sortOrder: TransactionSortOrder) {
     list { id merchantName transactionDate amount transactionType transactionStatus card { id } }
   }
 }`;
+// Authoritative month-to-date spending, not a sum of the truncated
+// recent-transactions page. Klutch documents sumTransactions + TransactionFilter.
+const MONTH_SPEND_QUERY = `query($filter: TransactionFilter) {
+  sumTransactions(filter: $filter)
+}`;
 const CREATE_CARD = `mutation ($name: String, $media: CardMedia) {
   createCard(name: $name, media: $media) {
     id name status lastFour expirationDate media
@@ -365,6 +370,36 @@ export function createNyxiServer({
         const data = await klutchCall(user.id, row, CARDS_QUERY);
         return json(res, 200, {
           cards: Array.isArray(data.cards) ? data.cards.map(safeCard) : [],
+        }, origin);
+      }
+      if (route === '/api/klutch/insights' && req.method === 'GET') {
+        const now = new Date(clock());
+        const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+        const period = first.toISOString().slice(0, 7);
+        const filter = {
+          startDate: first.toISOString(),
+          endDate: new Date(next.getTime() - 1).toISOString(),
+          transactionStatus: ['SETTLED'],
+          transactionTypes: ['CHARGE'],
+        };
+        // An unavailable API query is NOT a zero-dollar spending month.
+        let amount = null;
+        try {
+          const data = await klutchCall(user.id, row, MONTH_SPEND_QUERY, { filter });
+          const value = data.sumTransactions;
+          if ((typeof value === 'number' && Number.isFinite(value)) ||
+              (typeof value === 'string' && /^-?\\d+(?:\\.\\d+)?$/.test(value))) {
+            const parsed = Number(value);
+            if (Number.isFinite(parsed)) amount = parsed;
+          }
+        } catch {
+          // The card and transaction panels remain available if this metric
+          // isn't supported by the user's Klutch product.
+        }
+        return json(res, 200, {
+          period, currency: 'USD', settledCharges: amount,
+          source: 'klutch', available: amount !== null,
         }, origin);
       }
       if (route === '/api/klutch/transactions' && req.method === 'GET') {
