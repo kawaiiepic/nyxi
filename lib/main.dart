@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'desktop_shell.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -225,6 +227,31 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final desktop = screenWidth > 520;
+    final isDesktopPlatform = defaultTargetPlatform == TargetPlatform.linux ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+
+    // Desktop windows get a native, full-width dashboard. On phones, preserve
+    // the original reference-inspired mobile experience.
+    if (screenWidth >= (isDesktopPlatform ? 600 : 900)) {
+      return NyxiDesktopShell(
+        selectedTab: _tab,
+        title: const ['Overview', 'My cards', 'Activity', 'Savings'][_tab], 
+        onTabSelected: (index) => setState(() => _tab = index),
+        onOpenSettings: () => _showInfo(
+          'Settings',
+          'Nyxi is in preview mode. Account settings will be available when a secure data provider is connected.',
+        ),
+        onScan: () => _showInfo(
+          'Scan & pay',
+          'QR payments are not connected in preview mode.',
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) =>
+              _desktopContent(constraints.maxWidth),
+        ),
+      );
+    }
 
     // GlassPage owns the sampled pastel background, while the content keeps
     // the reference's clear white surfaces and bright magenta header.
@@ -325,6 +352,527 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
         ),
       ),
       ),
+    );
+  }
+
+
+  Widget _desktopContent(double width) {
+    switch (_tab) {
+      case 1:
+        return _desktopCards(width);
+      case 2:
+        return _desktopActivity();
+      case 3:
+        return _desktopSavings(width);
+      default:
+        return _desktopHome(width);
+    }
+  }
+
+  Widget _desktopIntro(String heading, String description) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          heading,
+          style: const TextStyle(
+            color: NyxiPalette.ink,
+            fontSize: 31,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -1.3,
+          ),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          description,
+          style: const TextStyle(
+            color: NyxiPalette.muted,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _desktopHome(double width) {
+    final wide = width >= 950;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _desktopIntro(
+          'Your money, at a glance',
+          'Everything in one place, with a little extra sparkle.',
+        ),
+        const SizedBox(height: 24),
+        if (wide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 6, child: _desktopBalancePanel()),
+              const SizedBox(width: 18),
+              Expanded(flex: 4, child: _desktopCardPreview()),
+            ],
+          )
+        else
+          Column(
+            children: [
+              _desktopBalancePanel(),
+              const SizedBox(height: 18),
+              _desktopCardPreview(),
+            ],
+          ),
+        const SizedBox(height: 18),
+        if (wide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 6, child: _desktopActivityPanel(full: false)),
+              const SizedBox(width: 18),
+              Expanded(flex: 4, child: _desktopSavingsPanel()),
+            ],
+          )
+        else
+          Column(
+            children: [
+              _desktopActivityPanel(full: false),
+              const SizedBox(height: 18),
+              _desktopSavingsPanel(),
+            ],
+          ),
+        const SizedBox(height: 22),
+        const _PreviewNotice(),
+      ],
+    );
+  }
+
+  Widget _desktopBalancePanel() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(26),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(27),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF30172F),
+            Color(0xFF8C155F),
+            Color(0xFFCF398F),
+          ],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                CupertinoIcons.money_dollar_circle,
+                color: Color(0xFFFFB7E3),
+                size: 20,
+              ),
+              SizedBox(width: 9),
+              Text(
+                'AVAILABLE TO SPEND',
+                style: TextStyle(
+                  color: Color(0xFFF8DCEC),
+                  fontSize: 11,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 30),
+          Text(
+            money(_cash),
+            style: const TextStyle(
+              color: CupertinoColors.white,
+              fontSize: 46,
+              letterSpacing: -2.0,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Demo cash balance',
+            style: TextStyle(
+              color: Color(0xFFF5CDE5),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 29),
+          Row(
+            children: [
+              Expanded(
+                child: _PillButton(
+                  text: 'Add money',
+                  onTap: () => _changeCash(deposit: true),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _PillButton(
+                  text: 'Withdraw',
+                  onTap: () => _changeCash(deposit: false),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopCardPreview() {
+    return _WhiteCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Your virtual card',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: NyxiPalette.ink,
+                  ),
+                ),
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () => setState(() => _tab = 1),
+                child: const Text(
+                  'Manage',
+                  style: TextStyle(
+                    color: NyxiPalette.berry,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _tab = 1),
+            child: _FullCard(frozen: _cardFrozen),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _cardFrozen ? 'Card frozen · Demo' : 'Card active · Demo',
+            style: const TextStyle(
+              fontSize: 11,
+              color: NyxiPalette.muted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopActivityPanel({required bool full}) {
+    final activities = full ? _activities : _activities.take(4);
+    return _WhiteCard(
+      child: Column(
+        children: [
+          _SectionHeader(
+            name: full ? 'All transactions' : 'Recent activity',
+            onTap: full ? null : () => setState(() => _tab = 2),
+          ),
+          const SizedBox(height: 13),
+          for (final item in activities)
+            _ActivityRow(
+              activity: item,
+              onTap: () => _showActivity(item),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopSavingsPanel() {
+    return _WhiteCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(
+            name: 'Rainy day fund',
+            onTap: () => setState(() => _tab = 3),
+          ),
+          const SizedBox(height: 25),
+          Text(
+            money(_savings),
+            style: const TextStyle(
+              fontSize: 39,
+              fontWeight: FontWeight.w800,
+              color: NyxiPalette.ink,
+              letterSpacing: -1.4,
+            ),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'of your \\$200.00 savings goal',
+            style: TextStyle(
+              color: NyxiPalette.muted,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 19),
+          LinearProgressIndicatorLike(
+            value: (_savings / 200).clamp(0.0, 1.0),
+          ),
+          const SizedBox(height: 9),
+          const Text(
+            'A little future-you fund ✧',
+            style: TextStyle(
+              color: NyxiPalette.muted,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 23),
+          Row(
+            children: [
+              Expanded(
+                child: _PillButton(
+                  text: 'Save money',
+                  onTap: () => _moveSavings(save: true),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _PillButton(
+                  text: 'Move to cash',
+                  onTap: () => _moveSavings(save: false),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopCards(double width) {
+    final wide = width >= 900;
+    final card = _WhiteCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Nyxi virtual card',
+            style: TextStyle(
+              color: NyxiPalette.ink,
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _FullCard(frozen: _cardFrozen),
+          const SizedBox(height: 13),
+          const Text(
+            'Preview card · Not connected to an issuer',
+            style: TextStyle(color: NyxiPalette.muted, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+
+    final controls = _WhiteCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Card controls',
+            style: TextStyle(
+              fontSize: 15,
+              color: NyxiPalette.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 25),
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Freeze card',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      'Pause this demo card',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: NyxiPalette.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              GlassSwitch(
+                activeColor: NyxiPalette.pink,
+                value: _cardFrozen,
+                onChanged: (value) => setState(() => _cardFrozen = value),
+              ),
+            ],
+          ),
+          const SizedBox(height: 23),
+          _FeatureRow(
+            icon: CupertinoIcons.slider_horizontal_3,
+            label: 'Spending limits',
+            onTap: () => _showInfo(
+              'Spending limits',
+              'Connect a supported card issuer to control real card spending.',
+            ),
+          ),
+          const SizedBox(height: 20),
+          _FeatureRow(
+            icon: CupertinoIcons.add_circled,
+            label: 'Create virtual card',
+            onTap: () => _showInfo(
+              'Create a card',
+              'No real card can be issued in demo mode.',
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _desktopIntro(
+          'my cards',
+          'Keep your virtual cards close and their controls even closer.',
+        ),
+        const SizedBox(height: 24),
+        if (wide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 6, child: card),
+              const SizedBox(width: 18),
+              Expanded(flex: 4, child: controls),
+            ],
+          )
+        else
+          Column(
+            children: [
+              card,
+              const SizedBox(height: 18),
+              controls,
+            ],
+          ),
+        const SizedBox(height: 18),
+        const _PreviewNotice(),
+      ],
+    );
+  }
+
+  Widget _desktopActivity() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _desktopIntro(
+          'your activity',
+          'Every little transaction, all in one place.',
+        ),
+        const SizedBox(height: 24),
+        _desktopActivityPanel(full: true),
+        const SizedBox(height: 18),
+        const _PreviewNotice(),
+      ],
+    );
+  }
+
+  Widget _desktopSavings(double width) {
+    final wide = width >= 950;
+    final summary = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(30),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(27),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFFE0F0),
+            Color(0xFFE6DCFF),
+            Color(0xFFD9FFEB),
+          ],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '✦  rainy day fund',
+            style: TextStyle(
+              color: NyxiPalette.deepBerry,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 45),
+          Text(
+            money(_savings),
+            style: const TextStyle(
+              fontSize: 49,
+              color: NyxiPalette.ink,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -2,
+            ),
+          ),
+          const SizedBox(height: 7),
+          const Text(
+            'of your \\$200.00 goal',
+            style: TextStyle(color: NyxiPalette.deepBerry, fontSize: 12),
+          ),
+          const SizedBox(height: 24),
+          LinearProgressIndicatorLike(
+            value: (_savings / 200).clamp(0.0, 1.0),
+            background: const Color(0x66FFFFFF),
+          ),
+        ],
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _desktopIntro(
+          'make room to grow',
+          'Your savings, at your own pace.',
+        ),
+        const SizedBox(height: 24),
+        if (wide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 6, child: summary),
+              const SizedBox(width: 18),
+              Expanded(flex: 4, child: _desktopSavingsPanel()),
+            ],
+          )
+        else
+          Column(
+            children: [
+              summary,
+              const SizedBox(height: 18),
+              _desktopSavingsPanel(),
+            ],
+          ),
+        const SizedBox(height: 18),
+        const _PreviewNotice(),
+      ],
     );
   }
 
