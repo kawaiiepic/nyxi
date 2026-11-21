@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'desktop_shell.dart';
 import 'klutch_panel.dart';
+import 'nyxi_auth_gate.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -21,7 +22,10 @@ Future<void> main() async {
 /// Nyxi's prototype contains demo money only. Real financial actions require
 /// a separately designed and authenticated backend integration.
 class NyxiApp extends StatelessWidget {
-  const NyxiApp({super.key});
+  const NyxiApp({super.key, this.controller});
+
+  /// Optional test controller. Production sessions belong to the auth gate.
+  final KlutchController? controller;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +37,11 @@ class NyxiApp extends StatelessWidget {
         primaryColor: NyxiPalette.pink,
         scaffoldBackgroundColor: NyxiPalette.paper,
       ),
-      home: const NyxiDashboard(),
+      home: NyxiAuthGate(
+        controller: controller,
+        dashboardBuilder: (authenticatedController) =>
+            NyxiDashboard(controller: authenticatedController),
+      ),
     );
   }
 }
@@ -69,7 +77,9 @@ class MoneyActivity {
 }
 
 class NyxiDashboard extends StatefulWidget {
-  const NyxiDashboard({super.key});
+  const NyxiDashboard({super.key, required this.controller});
+
+  final KlutchController controller;
 
   @override
   State<NyxiDashboard> createState() => _NyxiDashboardState();
@@ -80,7 +90,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
   double _cash = 91.50;
   double _savings = 50;
   bool _cardFrozen = false;
-  final KlutchController _klutch = KlutchController();
+  KlutchController get _klutch => widget.controller;
 
   final List<MoneyActivity> _activities = [
     const MoneyActivity(
@@ -105,12 +115,6 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
       tint: Color(0xFFEFA4C4),
     ),
   ];
-
-  @override
-  void dispose() {
-    _klutch.dispose();
-    super.dispose();
-  }
 
   void _showInfo(String title, String message) {
     showCupertinoDialog<void>(
