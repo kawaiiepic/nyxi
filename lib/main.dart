@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'desktop_shell.dart';
+import 'klutch_panel.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -79,6 +80,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
   double _cash = 91.50;
   double _savings = 50;
   bool _cardFrozen = false;
+  final KlutchController _klutch = KlutchController();
 
   final List<MoneyActivity> _activities = [
     const MoneyActivity(
@@ -103,6 +105,12 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
       tint: Color(0xFFEFA4C4),
     ),
   ];
+
+  @override
+  void dispose() {
+    _klutch.dispose();
+    super.dispose();
+  }
 
   void _showInfo(String title, String message) {
     showCupertinoDialog<void>(
@@ -773,6 +781,8 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
             ],
           ),
         const SizedBox(height: 18),
+        KlutchCardsPanel(controller: _klutch),
+        const SizedBox(height: 18),
         const _PreviewNotice(),
       ],
     );
@@ -788,6 +798,8 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
         ),
         const SizedBox(height: 24),
         _desktopActivityPanel(full: true),
+        const SizedBox(height: 18),
+        KlutchActivityPanel(controller: _klutch),
         const SizedBox(height: 18),
         const _PreviewNotice(),
       ],
@@ -1125,7 +1137,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
         const _PageIntro(
           kicker: 'YOUR DIGITAL WALLET',
           title: 'my cards',
-          subtitle: 'Manage your Nyxi demo cards.',
+          subtitle: 'Manage demo cards and connect Klutch virtual cards.',
         ),
         const SizedBox(height: 22),
         _FullCard(frozen: _cardFrozen),
@@ -1179,6 +1191,8 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
           ),
         ),
         const SizedBox(height: 16),
+        KlutchCardsPanel(controller: _klutch),
+        const SizedBox(height: 16),
         const _PreviewNotice(),
       ],
     );
@@ -1210,6 +1224,8 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        KlutchActivityPanel(controller: _klutch),
         const SizedBox(height: 16),
         const _PreviewNotice(),
       ],
