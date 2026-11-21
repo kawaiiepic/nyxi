@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
-import 'klutch_gateway.dart';
-import 'klutch_panel.dart';
+import 'fluz_gateway.dart';
+import 'fluz_panel.dart';
 
 /// Single entry point for both mobile and desktop. The dashboard is never
 /// mounted without a recently verified Nyxi backend and account session.
@@ -14,9 +14,9 @@ class NyxiAuthGate extends StatefulWidget {
     this.controller,
   });
 
-  final Widget Function(KlutchController controller) dashboardBuilder;
+  final Widget Function(FluzController controller) dashboardBuilder;
   /// Supply a fake controller in tests; normally the gate owns its session.
-  final KlutchController? controller;
+  final FluzController? controller;
 
   @override
   State<NyxiAuthGate> createState() => _NyxiAuthGateState();
@@ -26,7 +26,7 @@ enum _GatePhase { checking, offline, signedOut, authenticating, ready }
 
 class _NyxiAuthGateState extends State<NyxiAuthGate>
     with WidgetsBindingObserver {
-  late final KlutchController _controller;
+  late final FluzController _controller;
   late final bool _ownsController;
   final _email = TextEditingController();
   final _password = TextEditingController();
@@ -40,7 +40,7 @@ class _NyxiAuthGateState extends State<NyxiAuthGate>
   void initState() {
     super.initState();
     _ownsController = widget.controller == null;
-    _controller = widget.controller ?? KlutchController();
+    _controller = widget.controller ?? FluzController();
     _controller.addListener(_onAccountChanged);
     WidgetsBinding.instance.addObserver(this);
     // Never start in the dashboard, even when the app was hot-restarted.
@@ -111,7 +111,7 @@ class _NyxiAuthGateState extends State<NyxiAuthGate>
           return;
         }
         setState(() => _phase = _GatePhase.ready);
-      } on KlutchGatewayException catch (error) {
+      } on FluzGatewayException catch (error) {
         if (!mounted) return;
         if (error.statusCode == 401) {
           _controller.forgetSession();
