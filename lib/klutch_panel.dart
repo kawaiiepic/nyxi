@@ -1,287 +1,376 @@
+import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
-
 import 'klutch_gateway.dart';
 
-/// A single connection for the lifetime of the Nyxi dashboard.
-/// Credentials are held only in memory, not shared preferences or source code.
+/// Klutch requires both values, but Nyxi provides one paste field.
+Map<String, String> parseKlutchKey(String pasted) {
+  final value = pasted.trim();
+  if (value.startsWith('{')) {
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is Map<String, dynamic>) {
+        final id = decoded['clientId'];
+        final secret = decoded['secretKey'];
+        if (id is String && secret is String &&
+            id.trim().isNotEmpty && secret.trim().isNotEmpty) {
+          return {'clientId': id.trim(), 'secretKey': secret.trim()};
+        }
+      }
+    } on FormatException {
+      // No credential data is logged or displayed on failure.
+    }
+  }
+  final lines = value.split(RegExp(r'\r?\n'));
+  if (lines.length == 2 && lines.every((part) => part.trim().isNotEmpty)) {
+    return {'clientId': lines[0].trim(), 'secretKey': lines[1].trim()};
+  }
+  final separator = value.indexOf(':');
+  if (separator > 0 && !value.contains('\n')) {
+    final id = value.substring(0, separator).trim();
+    final secret = value.substring(separator + 1).trim();
+    if (id.isNotEmpty && secret.isNotEmpty) {
+      return {'clientId': id, 'secretKey': secret};
+    }
+  }
+  throw const FormatException(
+    'Klutch needs both a Client ID and Secret Key. Paste '
+    'clientId:secretKey or a JSON pair into this field.',
+  );
+}
+
 class KlutchController extends ChangeNotifier {
-  KlutchGateway? _gateway;
+  final KlutchGateway api = KlutchGateway();
+  NyxiUser? user;
   List<KlutchCard> cards = const [];
   List<KlutchTransaction> transactions = const [];
   bool loading = false;
   bool connected = false;
   String? error;
+  bool _disposed = false;
+  bool get signedIn => user != null;
+  void _emit() { if (!_disposed) notifyListeners(); }
 
-  Future<void> connect(String gatewayToken) async {
-    _gateway?.close();
-    _gateway = KlutchGateway(accessToken: gatewayToken);
-    connected = false;
-    cards = const [];
-    transactions = const [];
-    await refresh();
-  }
-
-  Future<void> refresh() async {
-    final gateway = _gateway;
-    if (gateway == null || loading) return;
-    loading = true;
-    error = null;
-    notifyListeners();
+  Future<void> _work(Future<void> Function() task) async {
+    if (loading) return;
+    loading = true; error = null; _emit();
     try {
-      final loaded = await Future.wait<Object>([
-        gateway.cards(),
-        gateway.transactions(),
-      ]);
-      cards = loaded[0] as List<KlutchCard>;
-      transactions = loaded[1] as List<KlutchTransaction>;
-      connected = true;
+      await task();
     } catch (failure) {
       error = failure.toString();
-      connected = false;
+      if (!api.signedIn) {
+        user = null;
+        connected = false;
+        cards = const [];
+        transactions = const [];
+      }
     } finally {
-      loading = false;
-      notifyListeners();
+      loading = false; _emit();
     }
   }
+
+  Future<void> authenticate(String email, String password,
+      {required bool register}) => _work(() async {
+    user = register
+        ? await api.register(email, password)
+        : await api.login(email, password);
+    await _loadConnection();
+  });
+
+  Future<void> _loadConnection() async {
+    connected = await api.status();
+    if (connected) {
+      final results = await Future.wait<Object>([api.cards(), api.transactions()]);
+      cards = results[0] as List<KlutchCard>;
+      transactions = results[1] as List<KlutchTransaction>;
+    } else {
+      cards = const []; transactions = const [];
+    }
+  }
+
+  Future<void> refresh() => _work(_loadConnection);
+
+  Future<void> connectPastedKey(String pasted) async {
+    Map<String, String> pair;
+    try {
+      pair = parseKlutchKey(pasted);
+    } on FormatException catch (failure) {
+      error = failure.message; _emit(); return;
+    }
+    await _work(() async {
+      await api.connectKlutch(
+        clientId: pair['clientId']!,
+        secretKey: pair['secretKey']!,
+      );
+      await _loadConnection();
+    });
+  }
+
+  Future<void> disconnect() => _work(() async {
+    await api.disconnectKlutch();
+    connected = false; cards = const []; transactions = const [];
+  });
+
+  Future<void> logout() => _work(() async {
+    try { await api.logout(); }
+    finally {
+      user = null; connected = false; cards = const []; transactions = const [];
+    }
+  });
 
   Future<bool> createVirtualCard(String name) async {
-    final gateway = _gateway;
-    if (gateway == null || loading || !connected) return false;
-    loading = true;
-    error = null;
-    notifyListeners();
-    try {
-      final created = await gateway.createVirtualCard(name);
-      cards = [created, ...cards.where((card) => card.id != created.id)];
-      return true;
-    } catch (failure) {
-      error = 'Card creation could not be confirmed: ' + failure.toString() +
-          '. Check Klutch before retrying.';
-      return false;
-    } finally {
-      loading = false;
-      notifyListeners();
+    if (loading || !signedIn || !connected) return false;
+    var created = false;
+    await _work(() async {
+      final card = await api.createVirtualCard(name);
+      cards = [card, ...cards.where((other) => other.id != card.id)];
+      created = true;
+    });
+    if (!created && error != null) {
+      error = error! + ' Check Klutch before retrying an uncertain request.';
+      _emit();
     }
-  }
-
-  void disconnect() {
-    _gateway?.close();
-    _gateway = null;
-    cards = const [];
-    transactions = const [];
-    loading = false;
-    connected = false;
-    error = null;
-    notifyListeners();
+    return created;
   }
 
   @override
   void dispose() {
-    _gateway?.close();
+    _disposed = true;
+    api.close();
     super.dispose();
   }
 }
 
 class KlutchCardsPanel extends StatelessWidget {
   const KlutchCardsPanel({super.key, required this.controller});
-
   final KlutchController controller;
 
-  Future<void> _connect(BuildContext context) async {
-    var input = '';
-    final key = await showCupertinoDialog<String>(
-        context: context,
-        builder: (dialogContext) => CupertinoAlertDialog(
-          title: const Text('Connect Klutch'),
-          content: Column(
-            children: [
-              const SizedBox(height: 10),
-              const Text(
-                'Enter your local Nyxi gateway access token. '
-                'Klutch developer credentials stay on the gateway.',
-              ),
-              const SizedBox(height: 12),
-              CupertinoTextField(
-                onChanged: (value) => input = value,
-                obscureText: true,
-                placeholder: 'Gateway access token',
-                autocorrect: false,
-                enableSuggestions: false,
-              ),
-            ],
+  Future<void> _signIn(BuildContext context, {required bool register}) async {
+    var email = '';
+    var password = '';
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialog) => CupertinoAlertDialog(
+        title: Text(register ? 'Create Nyxi account' : 'Sign in to Nyxi'),
+        content: Column(children: [
+          const SizedBox(height: 12),
+          CupertinoTextField(
+            onChanged: (value) => email = value.trim(),
+            placeholder: 'Email',
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
           ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            CupertinoDialogAction(
-              onPressed: () => Navigator.of(dialogContext).pop(input.trim()),
-              child: const Text('Connect'),
-            ),
-          ],
-        ),
-      );
-    if (key != null && key.isNotEmpty) await controller.connect(key);
+          const SizedBox(height: 10),
+          CupertinoTextField(
+            onChanged: (value) => password = value,
+            placeholder: 'Password',
+            obscureText: true,
+            autocorrect: false,
+            enableSuggestions: false,
+          ),
+          if (register) const Text('At least 12 characters'),
+        ]),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialog).pop(false),
+            child: const Text('Cancel'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(dialog).pop(true),
+            child: Text(register ? 'Register' : 'Sign in'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && email.isNotEmpty && password.isNotEmpty) {
+      await controller.authenticate(email, password, register: register);
+    }
+  }
+
+  Future<void> _pasteKey(BuildContext context) async {
+    var pasted = '';
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialog) => CupertinoAlertDialog(
+        title: const Text('Connect Klutch'),
+        content: Column(children: [
+          const SizedBox(height: 10),
+          const Text('Paste your Klutch API credentials in one field. '
+              'Klutch requires both Client ID and Secret Key, '
+              'formatted as clientId:secretKey or JSON.'),
+          const SizedBox(height: 12),
+          CupertinoTextField(
+            onChanged: (value) => pasted = value,
+            obscureText: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            placeholder: 'Paste Klutch API credentials',
+          ),
+          const SizedBox(height: 10),
+          const Text('Nyxi encrypts these credentials on your server. '
+              'Only connect to a server you trust.'),
+        ]),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialog).pop(false),
+            child: const Text('Cancel'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(dialog).pop(true),
+            child: const Text('Connect'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && pasted.trim().isNotEmpty) {
+      await controller.connectPastedKey(pasted);
+    }
   }
 
   Future<void> _createCard(BuildContext context) async {
-    var input = '';
-    final name = await showCupertinoDialog<String>(
-        context: context,
-        builder: (dialogContext) => CupertinoAlertDialog(
-          title: const Text('Create a real Klutch card?'),
-          content: Column(
-            children: [
-              const SizedBox(height: 10),
-              const Text(
-                'This sends a real virtual-card issuance request to Klutch. '
-                'It is NOT a demo action. Create cards only for your own account.',
-              ),
-              const SizedBox(height: 12),
-              CupertinoTextField(
-                onChanged: (value) => input = value,
-                placeholder: 'Card name (e.g. Subscriptions)',
-                maxLength: 60,
-              ),
-            ],
+    var name = '';
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialog) => CupertinoAlertDialog(
+        title: const Text('Issue a real virtual card?'),
+        content: Column(children: [
+          const SizedBox(height: 10),
+          const Text('This requests a REAL Klutch card, not a demo card.'),
+          const SizedBox(height: 12),
+          CupertinoTextField(
+            onChanged: (value) => name = value.trim(),
+            maxLength: 60,
+            placeholder: 'Card name',
           ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            CupertinoDialogAction(
-              isDefaultAction: true,
-              onPressed: () => Navigator.of(dialogContext).pop(input.trim()),
-              child: const Text('Issue virtual card'),
-            ),
-          ],
-        ),
-      );
-    if (name != null && name.length >= 2) {
+        ]),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialog).pop(false),
+            child: const Text('Cancel'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(dialog).pop(true),
+            child: const Text('Issue real card'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && name.length >= 2) {
       await controller.createVirtualCard(name);
     }
   }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) => GlassContainer.card(
-          width: double.infinity,
-          surfaceStyle: GlassSurfaceStyle.solid,
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(
-                    CupertinoIcons.creditcard_fill,
-                    color: Color(0xFFB51B7C),
-                    size: 21,
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Klutch virtual cards',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: Color(0xFF171219),
-                      ),
-                    ),
-                  ),
-                  if (controller.connected)
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: controller.loading ? null : controller.refresh,
-                      child: const Icon(CupertinoIcons.refresh, size: 20),
-                    ),
-                ],
+    animation: controller,
+    builder: (context, _) => GlassContainer.card(
+      width: double.infinity,
+      surfaceStyle: GlassSurfaceStyle.solid,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(CupertinoIcons.creditcard_fill,
+                size: 21, color: Color(0xFFB51B7C)),
+            const SizedBox(width: 10),
+            const Expanded(child: Text('Klutch virtual cards',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800))),
+            if (controller.signedIn)
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: controller.loading ? null : controller.refresh,
+                child: const Icon(CupertinoIcons.refresh, size: 20),
               ),
-              const SizedBox(height: 8),
-              Text(
-                controller.connected
-                    ? 'LIVE · Your real Klutch account'
-                    : 'Optional integration · Demo cards stay separate',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF9D97A1),
-                ),
+          ]),
+          const SizedBox(height: 8),
+          Text(controller.signedIn
+                  ? 'Nyxi account · ' + controller.user!.email
+                  : 'Sign in to Nyxi to connect your Klutch account',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF9D97A1))),
+          if (controller.loading) ...[
+            const SizedBox(height: 15),
+            const CupertinoActivityIndicator(),
+          ],
+          if (controller.error != null) ...[
+            const SizedBox(height: 12),
+            Text(controller.error!,
+                style: const TextStyle(color: Color(0xFFA82562), fontSize: 12)),
+          ],
+          if (!controller.signedIn) ...[
+            const SizedBox(height: 14),
+            const Text('Create a Nyxi account. No local scripts are needed.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF6B606D))),
+            Wrap(spacing: 14, children: [
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: controller.loading ? null
+                    : () => _signIn(context, register: false),
+                child: const Text('Sign in'),
               ),
-              if (controller.loading) ...[
-                const SizedBox(height: 16),
-                const CupertinoActivityIndicator(),
-              ],
-              if (controller.error != null) ...[
-                const SizedBox(height: 14),
-                Text(
-                  controller.error!,
-                  style: const TextStyle(color: Color(0xFFA82562), fontSize: 12),
-                ),
-              ],
-              if (!controller.connected) ...[
-                const SizedBox(height: 18),
-                const Text(
-                  'Connect your locally configured Klutch gateway to view '
-                  'masked card details and recent transactions.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF6B606D)),
-                ),
-                const SizedBox(height: 10),
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: controller.loading ? null : () => _connect(context),
-                  child: const Text('Connect Klutch'),
-                ),
-              ] else ...[
-                const SizedBox(height: 17),
-                if (controller.cards.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      'No Klutch cards were returned for this account.',
-                      style: TextStyle(color: Color(0xFF6B606D), fontSize: 12),
-                    ),
-                  ),
-                for (final card in controller.cards)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 9),
-                    child: _KlutchCardRow(card: card),
-                  ),
-                Row(
-                  children: [
-                    Flexible(
-                      child: CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: controller.loading ? null : () => _createCard(context),
-                        child: const Text('Create virtual card'),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: controller.disconnect,
-                      child: const Text(
-                        'Disconnect',
-                        style: TextStyle(color: Color(0xFF8B7E8D), fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 7),
-                const Text(
-                  'Card locking and sensitive card details are not available '
-                  'in this first integration.',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF9D97A1)),
-                ),
-              ],
-            ],
-          ),
-        ),
-      );
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: controller.loading ? null
+                    : () => _signIn(context, register: true),
+                child: const Text('Create account'),
+              ),
+            ]),
+          ] else if (!controller.connected) ...[
+            const SizedBox(height: 14),
+            const Text('Paste the Klutch API key pair once, then access '
+                'cards and transactions from your Nyxi account.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF6B606D))),
+            Wrap(spacing: 14, children: [
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: controller.loading ? null : () => _pasteKey(context),
+                child: const Text('Paste Klutch key'),
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: controller.loading ? null : controller.logout,
+                child: const Text('Sign out'),
+              ),
+            ]),
+          ] else ...[
+            const SizedBox(height: 14),
+            const Text('LIVE · Your Klutch account',
+                style: TextStyle(fontSize: 11, color: Color(0xFFB51B7C))),
+            if (controller.cards.isEmpty)
+              const Text('No cards returned.'),
+            for (final card in controller.cards)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 9),
+                child: _KlutchCardRow(card: card),
+              ),
+            Wrap(spacing: 12, children: [
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: controller.loading ? null : () => _createCard(context),
+                child: const Text('Create virtual card'),
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: controller.loading ? null : controller.disconnect,
+                child: const Text('Unlink Klutch'),
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: controller.loading ? null : controller.logout,
+                child: const Text('Sign out'),
+              ),
+            ]),
+            const Text('Card freeze and sensitive card details are unavailable.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF9D97A1))),
+          ],
+        ],
+      ),
+    ),
+  );
 }
 
 class _KlutchCardRow extends StatelessWidget {
@@ -371,7 +460,7 @@ class KlutchActivityPanel extends StatelessWidget {
               const SizedBox(height: 11),
               if (!controller.connected)
                 const Text(
-                  'Connect Klutch in the Cards tab to see real transactions here.',
+                  'Sign in and connect Klutch in the Cards tab to see real transactions.',
                   style: TextStyle(
                     fontSize: 12,
                     color: Color(0xFF9D97A1),
