@@ -286,6 +286,9 @@ export function createNyxiServer({
       if (route === '/api/fluz/balance' && req.method === 'GET') {
         return json(res, 200, await fluz.balance(user.id), origin);
       }
+      if (route === '/api/fluz/bank-accounts' && req.method === 'GET') {
+        return json(res, 200, { accounts: await fluz.bankAccounts(user.id) }, origin);
+      }
       if (route === '/api/fluz/offers' && req.method === 'GET') {
         return json(res, 200, { offers: await fluz.offers(user.id) }, origin);
       }
