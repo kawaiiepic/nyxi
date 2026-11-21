@@ -85,6 +85,8 @@ export function createNyxiServer({
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at);
+    -- Fluz replaces Klutch; purge unused encrypted Klutch API credentials.
+    DROP TABLE IF EXISTS klutch_connections;
   `);
 
   function encrypt(value, userId) {
