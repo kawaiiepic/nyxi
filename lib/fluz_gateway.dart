@@ -161,9 +161,9 @@ class FluzGateway {
         : <FluzOffer>[];
   }
 
-  Future<Uri> provisioningUrl(String offerId, {required String platform}) async {
+  Future<Uri> provisioningUrl(String cardId, {required String platform}) async {
     final result = await _request('/api/fluz/wallet-provision',
-        method: 'POST', payload: {'offerId': offerId, 'platform': platform});
+        method: 'POST', payload: {'cardId': cardId, 'platform': platform});
     final url = result['url'];
     if (url is! String || !url.startsWith('https://')) {
       throw const FluzGatewayException('Fluz Wallet provisioning is not available.');
