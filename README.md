@@ -2,7 +2,7 @@
 
 A cybercute personal-finance app built with Flutter.
 
-Nyxi starts with a polished, interactive demo home screen inspired by the supplied pink money-app reference. All amounts are **demo data**; no banking or card provider is connected.
+Nyxi starts with a polished, interactive demo home screen inspired by the supplied pink money-app reference. The initial cash and savings amounts are **demo data**; Klutch card data is optional and account-linked.
 
 ## Run
 
@@ -29,70 +29,85 @@ The Flutter platform runner directories are intentionally generated locally. The
 - All views share one in-memory demo state, so balances and card controls
   survive resizing, but reset when the app restarts.
 
-## Klutch integration (personal developer preview)
+## Nyxi accounts and Klutch integration
 
-Nyxi can now read **real Klutch cards**, display **recent transactions**, and
-**issue virtual cards** through an opt-in local gateway. Demo balances, demo
-transfers, and demo card-freeze controls are **not** Klutch account actions.
+Nyxi now supports **central account registration, login, and per-user Klutch
+connections**. Users do **not** run a Klutch gateway on their own computers.
+They sign in to the same Nyxi backend and connect Klutch from **Cards**.
 
-Klutch documents a GraphQL production endpoint, a sandbox endpoint, and a
-`createSessionToken(clientId, secretKey)` authentication mutation.
+### Run the central API (server operator only)
+
+Node.js 22+ is required because the API uses the built-in SQLite module.
+From the repository directory, run:
+
+```bash
+export NYXI_ENCRYPTION_KEY="$(openssl rand -hex 32)"
+export NYXI_ALLOW_SIGNUPS=true
+export NYXI_DB_PATH=./.data/nyxi.sqlite
+node backend/server.mjs
+```
+
+Keep `NYXI_ENCRYPTION_KEY` secure **and permanently backed up**. All Klutch
+connections use authenticated AES-256-GCM encryption with per-user derived
+keys. If this key is lost, encrypted connections cannot be recovered.
+Never commit the key or database to Git. Use a password manager or secret
+management service for production. User passwords use scrypt; Nyxi sessions
+are opaque random tokens stored as hashes in SQLite.
+
+By default, the API listens on **127.0.0.1:8787**. For actual multi-device
+use, deploy **one backend** behind an HTTPS reverse proxy. Do not expose
+plaintext HTTP to the public internet. Use `HOST` and `PORT` only in a
+secured deployment, and configure `NYXI_ALLOWED_ORIGINS` when browser
+clients require cross-origin access. For remote access, run Flutter with:
+
+```bash
+flutter run -d linux --dart-define=NYXI_API_URL=https://api.your-nyxi-domain.example
+```
+
+Android, iOS and Windows clients must also be configured with a reachable
+HTTPS URL; localhost refers to the client's device, not your remote server.
+
+### How a Nyxi user connects Klutch
+
+1. Open **Cards → Create account** or **Sign in**.
+2. Select **Paste Klutch key** and paste Klutch's API credential pair in
+   **one input field**. Formats supported:
+   - `clientId:secretKey`
+   - A JSON object containing `clientId` and `secretKey`
+   - Client ID and Secret Key on separate lines
+3. Nyxi validates the credentials with Klutch and stores the encrypted
+   connection in the user's backend account.
+4. View masked cards, recent transactions, or issue a real virtual card
+   when the server administrator has explicitly enabled issuance.
+
+Klutch calls these API credentials an "API key", but its documented
+`createSessionToken` mutation requires both the Client ID and Secret Key.
+It does **not** support authenticating using an arbitrary lone secret key.
 Documentation: https://api-docs.klutchcard.com/
 
-### Start the private local gateway
+### Important security and platform limits
 
-1. Sign into Klutch and open **My Account → Developers** to obtain a personal
-   `clientId` and `secretKey`. Do not put these in the Flutter app, Git, or
-   `--dart-define`.
-2. Set the following variables in your **terminal**, not in source code:
-
-   ```bash
-   export KLUTCH_CLIENT_ID='your-client-id'
-   export KLUTCH_SECRET_KEY='your-secret-key'
-   export KLUTCH_ENV='production'
-   export NYXI_GATEWAY_TOKEN="$(openssl rand -hex 32)"
-   printf 'Nyxi gateway token: %s\n' "$NYXI_GATEWAY_TOKEN"
-   node gateway/server.mjs
-   ```
-
-   For a registered Mini App development environment, set
-   `KLUTCH_ENV=sandbox` if Klutch has granted you sandbox credentials.
-   A personal Klutch API key is intended for production.
-
-3. In another terminal, run `flutter run -d linux` (or your target device).
-4. Open **Cards → Connect Klutch** and paste **NYXI_GATEWAY_TOKEN**, not your
-   Klutch secret. For a running terminal, copy the token from the variable
-   you created in step 2.
-5. Nyxi retrieves card metadata and recent transactions only after you
-   explicitly connect. Click **Create virtual card** to confirm a real issuance.
-
-The gateway binds to **127.0.0.1:8787 only**, requires a long independent
-access token, and keeps the Klutch developer secret server-side. Its data is
-never saved to disk. The Flutter app holds the gateway token only in memory
-until the current session ends. It does not request, render, or cache full
-card numbers or CVV.
-
-When running on an Android emulator, start the gateway on a reachable trusted
-interface **only after** securing its transport, then compile with
-`--dart-define=NYXI_KLUTCH_URL=https://your-secure-gateway.example`. An emulator
-normally uses `10.0.2.2` for the host, but the default gateway is loopback
-only and is not reachable from it. Do not publish or port-forward the local
-gateway as-is.
-
-### Current limitations
-
-- This is a **single-user personal integration**, not an approved Nyxi
-  multi-user Klutch Mini App. Other people's accounts will require Klutch
-  Mini App enrollment, permissioned per-user authentication, and a production
-  service that isolates accounts and data.
-- The desktop/mobile demo card-freeze toggle has **no effect** on Klutch.
-  Real card locking, rule creation, card-number reveal, webhooks, and
-  background synchronization are not implemented.
-- Only the first 30 recent Klutch transactions are shown. They do not change
-  Nyxi's fictional cash and savings amounts.
-- The gateway's Node.js tests use a fake Klutch server and can run with
-  `node --test gateway/server.test.mjs`. Live Klutch account testing requires
-  your own credentials and explicit authorization.
+- **This is a self-hosted developer preview, not ready for public users.**
+  Central storage of users' Klutch developer secrets carries substantial
+  risk. A production release should use Klutch's approved permissioned
+  Mini App authorization instead of asking ordinary users to provide
+  unrestricted developer credentials.
+- Sign-ups are **disabled by default** unless `NYXI_ALLOW_SIGNUPS=true`.
+  Add verified email, account recovery, persistent rate limits, auditing,
+  abuse controls, backup/rotation procedures, and a deployment security
+  review before opening Nyxi publicly.
+- **Real card issuance is off by default.** To enable, set
+  `NYXI_ENABLE_CARD_ISSUANCE=true` on the server, and require the user's
+  explicit confirmation. Each request has a unique idempotency identifier
+  and uncertain outcomes require manual review before retrying.
+- User sessions are currently held **only in Flutter memory**. After
+  restarting the app, users sign in again; the encrypted Klutch
+  connection remains linked to their Nyxi account.
+- Only the first 30 transactions are shown. Demo money and frozen demo
+  cards remain independent of Klutch. Full card numbers, CVV, and live
+  card locking are not requested or implemented.
+- For API tests with a mock Klutch provider, run
+  `node --test backend/server.test.mjs`. No real card is issued by tests.
 
 ## Liquid Glass UI
 
