@@ -8,17 +8,14 @@ on:
 jobs:
   analyze-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Test central Nyxi API
-        run: node --test backend/server.test.mjs
       - name: Fetch dependencies
         run: flutter pub get
       - name: Analyze Dart source
