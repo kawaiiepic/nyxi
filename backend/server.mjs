@@ -388,7 +388,7 @@ export function createNyxiServer({
             if (typeof value === 'number') return Number.isFinite(value) ? value : null;
             if (typeof value !== 'string') return null;
             const trimmed = value.trim();
-            if (!/^-?\\d+(?:\\.\\d+)?$/.test(trimmed)) return null;
+            if (!/^-?\d+(?:\.\d+)?$/.test(trimmed)) return null;
             const amount = Number(trimmed);
             return Number.isFinite(amount) ? amount : null;
           };
