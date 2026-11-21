@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'klutch_gateway.dart';
@@ -89,9 +90,8 @@ class KlutchCardsPanel extends StatelessWidget {
   final KlutchController controller;
 
   Future<void> _connect(BuildContext context) async {
-    final input = TextEditingController();
-    try {
-      final key = await showCupertinoDialog<String>(
+    var input = '';
+    final key = await showCupertinoDialog<String>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('Connect Klutch'),
@@ -104,7 +104,7 @@ class KlutchCardsPanel extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               CupertinoTextField(
-                controller: input,
+                onChanged: (value) => input = value,
                 obscureText: true,
                 placeholder: 'Gateway access token',
                 autocorrect: false,
@@ -118,22 +118,18 @@ class KlutchCardsPanel extends StatelessWidget {
               child: const Text('Cancel'),
             ),
             CupertinoDialogAction(
-              onPressed: () => Navigator.of(dialogContext).pop(input.text.trim()),
+              onPressed: () => Navigator.of(dialogContext).pop(input.trim()),
               child: const Text('Connect'),
             ),
           ],
         ),
       );
-      if (key != null && key.isNotEmpty) await controller.connect(key);
-    } finally {
-      input.dispose();
-    }
+    if (key != null && key.isNotEmpty) await controller.connect(key);
   }
 
   Future<void> _createCard(BuildContext context) async {
-    final input = TextEditingController();
-    try {
-      final name = await showCupertinoDialog<String>(
+    var input = '';
+    final name = await showCupertinoDialog<String>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('Create a real Klutch card?'),
@@ -146,7 +142,7 @@ class KlutchCardsPanel extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               CupertinoTextField(
-                controller: input,
+                onChanged: (value) => input = value,
                 placeholder: 'Card name (e.g. Subscriptions)',
                 maxLength: 60,
               ),
@@ -165,11 +161,8 @@ class KlutchCardsPanel extends StatelessWidget {
           ],
         ),
       );
-      if (name != null && name.length >= 2) {
-        await controller.createVirtualCard(name);
-      }
-    } finally {
-      input.dispose();
+    if (name != null && name.length >= 2) {
+      await controller.createVirtualCard(name);
     }
   }
 
