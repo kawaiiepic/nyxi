@@ -9,6 +9,7 @@ class FakeNyxiGateway extends KlutchGateway {
   bool online = true;
   bool validSession = false;
   bool hangHealth = false;
+  bool linked = false;
   final NyxiUser account = const NyxiUser(
     id: 'test-user-id',
     email: 'test@example.com',
@@ -53,14 +54,45 @@ class FakeNyxiGateway extends KlutchGateway {
   }
 
   @override
-  Future<bool> status() async => false;
+  Future<bool> status() async => linked;
 
   @override
-  Future<List<KlutchCard>> cards() async => const <KlutchCard>[];
+  Future<List<KlutchCard>> cards() async => linked
+      ? const [
+          KlutchCard(
+            id: 'card-real-test',
+            name: 'Subscriptions',
+            lastFour: '6532',
+            status: 'ACTIVE',
+            media: 'VIRTUAL',
+            lockState: '',
+            expirationDate: '2028-12',
+          ),
+        ]
+      : const <KlutchCard>[];
 
   @override
-  Future<List<KlutchTransaction>> transactions() async =>
-      const <KlutchTransaction>[];
+  Future<List<KlutchTransaction>> transactions() async => linked
+      ? const [
+          KlutchTransaction(
+            id: 'transaction-real-test',
+            merchantName: 'Verified Merchant',
+            date: '2026-11-20',
+            amount: 13.75,
+            status: 'SETTLED',
+            type: 'CHARGE',
+            cardId: 'card-real-test',
+          ),
+        ]
+      : const <KlutchTransaction>[];
+
+  @override
+  Future<KlutchMonthlyInsight> monthlyInsight() async =>
+      const KlutchMonthlyInsight(
+        period: '2026-11',
+        currency: 'USD',
+        settledCharges: 41.75,
+      );
 
   @override
   Future<void> logout() async => validSession = false;
