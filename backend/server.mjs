@@ -22,6 +22,10 @@ const TX_QUERY = `query ($limit: Int, $sortOrder: TransactionSortOrder) {
     list { id merchantName transactionDate amount transactionType transactionStatus card { id } }
   }
 }`;
+// Klutch's documented Account -> Get Balance request.
+const CREDIT_BALANCE_QUERY = `query {
+  account { revolvingLoan { balance limit } }
+}`;
 // Authoritative month-to-date spending, not a sum of the truncated
 // recent-transactions page. Klutch documents sumTransactions + TransactionFilter.
 const MONTH_SPEND_QUERY = `query($filter: TransactionFilter) {
@@ -370,6 +374,34 @@ export function createNyxiServer({
         const data = await klutchCall(user.id, row, CARDS_QUERY);
         return json(res, 200, {
           cards: Array.isArray(data.cards) ? data.cards.map(safeCard) : [],
+        }, origin);
+      }
+      if (route === '/api/klutch/balance' && req.method === 'GET') {
+        // Some Klutch products have no revolving loan. That must not be
+        // reported as zero debt or as a checking-account cash balance.
+        let outstandingBalance = null;
+        let creditLimit = null;
+        try {
+          const data = await klutchCall(user.id, row, CREDIT_BALANCE_QUERY);
+          const loan = object(object(data.account).revolvingLoan);
+          const finite = value => {
+            if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+            if (typeof value !== 'string') return null;
+            const trimmed = value.trim();
+            if (!/^-?\\d+(?:\\.\\d+)?$/.test(trimmed)) return null;
+            const amount = Number(trimmed);
+            return Number.isFinite(amount) ? amount : null;
+          };
+          outstandingBalance = finite(loan.balance);
+          creditLimit = finite(loan.limit);
+        } catch {
+          // Leave unsupported credit-account values unavailable, not fake.
+        }
+        return json(res, 200, {
+          source: 'klutch', currency: 'USD',
+          accountType: 'revolving_credit',
+          outstandingBalance, creditLimit,
+          available: outstandingBalance !== null || creditLimit !== null,
         }, origin);
       }
       if (route === '/api/klutch/insights' && req.method === 'GET') {
