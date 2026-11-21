@@ -2,7 +2,7 @@
 
 A cybercute personal-finance app built with Flutter.
 
-Nyxi is an authenticated desktop-and-mobile personal-finance dashboard. It retrieves actual virtual cards, transactions and month-to-date settled card charges through the central Nyxi API. It never invents bank balances or savings funds.
+Nyxi is an authenticated desktop-and-mobile personal-finance dashboard. It retrieves actual credit balances, limits, virtual cards, transactions and month-to-date settled card charges through the central Nyxi API. It never invents bank balances or savings funds.
 
 ## Run
 
@@ -58,6 +58,11 @@ Nyxi no longer contains mock balances, sample merchants, simulated deposits,
 withdrawals or a fake virtual card. The mobile and desktop Home screens display
 real data returned for the signed-in user:
 
+- **Klutch credit balance and limit**: retrieved via the documented
+  `account { revolvingLoan { balance limit } }` query through
+  `GET /api/klutch/balance`. These are revolving-credit figures, **not**
+  checking cash or savings balances. Some Klutch products may not expose
+  these fields, in which case Nyxi shows **Not available**.
 - **Monthly settled card charges**: computed by Klutch's
   `sumTransactions(filter: ...)` GraphQL query for settled `CHARGE`
   transactions within the current UTC month, served through
@@ -70,11 +75,12 @@ real data returned for the signed-in user:
   list is explicitly limited to the first 30 records and is not a complete
   account statement.
 - **Insights tab**: replaces the former fictional Savings tab. It displays
-  the verified spending metric, number of cards and loaded transactions.
+  the verified credit balance, limit, spending metric, number of cards
+  and loaded transactions.
   A cash/bank account balance or savings balance is clearly marked
   unavailable until an actual banking data provider supports those values.
 
-The former Add money, Withdraw, Move to savings, Move to cash and demo card
+The former Add money, Withdraw, Move to savings, Move to cash and simulated card
 freeze controls were removed. Nyxi cannot make cash transfers or represent
 an unrelated Klutch credit-card balance as bank deposits. Real virtual-card
 issuance uses the Klutch backend integration and remains disabled by default
