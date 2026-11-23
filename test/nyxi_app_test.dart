@@ -23,10 +23,8 @@ Future<FakeNyxiGateway> launchNyxi(
   final api = FakeNyxiGateway()
     ..online = online
     ..linked = linked;
-  final controller = FluzController(api: api);
-  addTearDown(controller.dispose);
   await tester.pumpWidget(
-    LiquidGlassWidgets.wrap(child: NyxiApp(controller: controller)),
+    LiquidGlassWidgets.wrap(child: _TestApp(api: api)),
   );
   await tester.pumpAndSettle();
 
@@ -44,6 +42,30 @@ Future<FakeNyxiGateway> launchNyxi(
     await tester.pumpAndSettle();
   }
   return api;
+}
+
+// Tie polling timers to the widget tree so they stop before Flutter checks
+// for pending timers at the end of each widget test.
+class _TestApp extends StatefulWidget {
+  const _TestApp({required this.api});
+
+  final FakeNyxiGateway api;
+
+  @override
+  State<_TestApp> createState() => _TestAppState();
+}
+
+class _TestAppState extends State<_TestApp> {
+  late final FluzController _controller = FluzController(api: widget.api);
+
+  @override
+  Widget build(BuildContext context) => NyxiApp(controller: _controller);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 }
 
 void main() {

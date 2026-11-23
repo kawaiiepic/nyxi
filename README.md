@@ -42,6 +42,19 @@ When enabled by the backend operator, Nyxi can request a Fluz virtual card with 
 
 The app intentionally uses **Cupertino and Liquid Glass**, including desktop/mobile adaptive cards, navigation, and transaction panels. No Material app shell.
 
+## iOS / TestFlight
+
+The iOS runner uses bundle ID `dev.blossomvale.nyxi`. Before running the **Nyxi iOS / TestFlight** workflow, register this bundle ID and create the Nyxi iOS app record in App Store Connect. Create an **App Store Connect distribution** provisioning profile for the same bundle ID and an active Apple Distribution certificate on team `7H8MNYGZ49`.
+
+Set these repository Actions secrets before dispatching the workflow:
+
+- `BUILD_CERTIFICATE_BASE64`: base64 of the Apple Distribution `.p12` that includes its private key.
+- `P12_PASSWORD`: the `.p12` export password.
+- `BUILD_PROVISION_PROFILE_BASE64`: base64 of the Nyxi `.mobileprovision` file.
+- `APPSTORE_ISSUER_ID`, `APPSTORE_API_KEY_ID`, `APPSTORE_API_PRIVATE_KEY`: the App Store Connect team issuer, matching key ID, and full `.p8` contents.
+
+The workflow checks that the profile matches Nyxi, exports a signed IPA, and submits it to TestFlight. Never commit the signing files or paste their contents into chat.
+
 ## Tests
 
 ```bash

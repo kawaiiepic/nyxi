@@ -1,0 +1,113 @@
+name: Nyxi iOS / TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_testflight:
+        description: Upload the signed build to TestFlight
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nyxi-testflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 55
+    env:
+      NYXI_BUNDLE_ID: dev.blossomvale.nyxi
+      NYXI_TEAM_ID: 7H8MNYGZ49
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install signing credentials
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          for name in BUILD_CERTIFICATE_BASE64 BUILD_PROVISION_PROFILE_BASE64 P12_PASSWORD APPSTORE_ISSUER_ID APPSTORE_API_KEY_ID APPSTORE_API_PRIVATE_KEY; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing GitHub Actions secret: $name"
+              exit 1
+            fi
+          done
+          umask 077
+          certificate="$RUNNER_TEMP/nyxi.p12"
+          profile="$RUNNER_TEMP/nyxi.mobileprovision"
+          keychain="$RUNNER_TEMP/nyxi-signing.keychain-db"
+          password=$(openssl rand -hex 32)
+          echo "::add-mask::$password"
+          printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 -D > "$certificate"
+          printf '%s' "$BUILD_PROVISION_PROFILE_BASE64" | base64 -D > "$profile"
+          security cms -D -i "$profile" > "$RUNNER_TEMP/nyxi-profile.plist"
+          uuid=$(python3 - <<'PY'
+          import datetime, os, pathlib, plistlib
+          temp = pathlib.Path(os.environ['RUNNER_TEMP'])
+          with (temp / 'nyxi-profile.plist').open('rb') as source:
+              profile = plistlib.load(source)
+          team, bundle = os.environ['NYXI_TEAM_ID'], os.environ['NYXI_BUNDLE_ID']
+          entitlements = profile['Entitlements']
+          expiry = profile['ExpirationDate'].replace(tzinfo=datetime.timezone.utc)
+          if (entitlements.get('application-identifier') != f'{team}.{bundle}'
+              or entitlements.get('get-task-allow')
+              or profile.get('ProvisionedDevices') or profile.get('ProvisionsAllDevices')
+              or expiry <= datetime.datetime.now(datetime.timezone.utc)):
+              raise SystemExit('Expected an unexpired App Store distribution profile for ' + bundle)
+          uuid = profile['UUID']
+          with (temp / 'NyxiExportOptions.plist').open('wb') as output:
+              plistlib.dump({'method': 'app-store-connect', 'signingStyle': 'manual',
+                  'teamID': team, 'signingCertificate': 'Apple Distribution',
+                  'provisioningProfiles': {bundle: uuid}}, output)
+          print(uuid)
+          PY
+          )
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$certificate" -P "$P12_PASSWORD" -T /usr/bin/codesign -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          for directory in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles"; do
+            mkdir -p "$directory"
+            cp "$profile" "$directory/$uuid.mobileprovision"
+          done
+          printf 'DEVELOPMENT_TEAM = %s\nCODE_SIGN_STYLE = Manual\nCODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution\nPROVISIONING_PROFILE_SPECIFIER = %s\n' "$NYXI_TEAM_ID" "$uuid" > ios/Flutter/TestFlightSigning.xcconfig
+          printf '\n#include "TestFlightSigning.xcconfig"\n' >> ios/Flutter/Release.xcconfig
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Archive and export signed IPA
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter build ipa --release --build-number="$GITHUB_RUN_NUMBER" \
+            --export-options-plist="$RUNNER_TEMP/NyxiExportOptions.plist"
+          ipa=$(find build/ios/ipa -maxdepth 1 -name '*.ipa' -print -quit)
+          test -n "$ipa"
+          echo "IPA_PATH=$ipa" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nyxi-ios-ipa
+          path: ${{ env.IPA_PATH }}
+          archive: false
+      - name: Upload to TestFlight
+        if: ${{ inputs.upload_testflight }}
+        uses: apple-actions/upload-testflight-build@v5.9.0
+        with:
+          backend: appstore-api
+          app-type: ios
+          app-path: ${{ env.IPA_PATH }}
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          wait-for-processing: false

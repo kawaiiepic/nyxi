@@ -190,7 +190,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
                         ),
                         const SizedBox(height: 18),
                         Container(
-                          height: 91,
+                          constraints: const BoxConstraints(minHeight: 91),
                           padding: const EdgeInsets.all(16),
                           width: double.infinity,
                           decoration: BoxDecoration(
@@ -201,6 +201,7 @@ class _NyxiDashboardState extends State<NyxiDashboard> {
                             borderRadius: BorderRadius.circular(19),
                           ),
                           child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text('Your linked finances',
