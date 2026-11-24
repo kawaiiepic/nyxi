@@ -22,6 +22,28 @@ Flutter 3.41+ is required. Platform runner directories are generated locally. Th
 
 Use the [Worker deployment guide](https://github.com/kawaiiepic/petal-backend/blob/main/docs/nyxi.md) to deploy migrations, configure Cloudflare secrets and update Fluz OAuth and webhook URLs. Old VPS accounts are not transferred automatically.
 
+## Backend setup (Cloudflare)
+
+The API is hosted by the shared `petal-backend` Worker; there is no separate Nyxi server to install.
+
+1. Clone the private `petal-backend` repository and run `npm ci`.
+2. Authenticate with `npx wrangler login` and configure the Worker resources and existing Petal secrets as described in its README.
+3. Run `npm run deploy` to apply D1 migrations, including `0031_nyxi.sql`, and deploy the Worker.
+4. Verify `curl -fsS https://petal-backend.blossomvale.dev/nyxi/health` returns `{"status":"ok","service":"nyxi-api"}`.
+5. Open Nyxi, choose **Create an account**, enter your email and a 12–128 character password, and sign in. Fluz credentials are not needed to register.
+
+To connect Fluz, configure `NYXI_ENCRYPTION_KEY` (64 hexadecimal characters) and the appropriate Fluz credentials using `npx wrangler secret put NAME`. For OAuth, register these exact URLs with Fluz:
+
+| Purpose | URL |
+| --- | --- |
+| API | `https://petal-backend.blossomvale.dev/nyxi` |
+| OAuth callback | `https://petal-backend.blossomvale.dev/nyxi/api/fluz/callback` |
+| Webhook | `https://petal-backend.blossomvale.dev/nyxi/api/fluz/webhook` |
+
+See the [full setup guide](https://github.com/kawaiiepic/petal-backend/blob/main/docs/nyxi.md) for OAuth and personal API-key mode. Registration does not verify email ownership or open a bank account. Keep card issuance disabled until the integration has been reviewed and tested.
+
+**Migration status:** The new architecture is in source control; deployment and live Fluz verification are separate steps. Existing VPS accounts and financial records are not automatically imported. Keep the old SQLite database and encryption key backed up until migration is verified. Do not expose them publicly.
+
 ## Account and Fluz connection
 
 - Nyxi requires a valid authenticated central-backend session. No guest, offline, or demo-only access.
@@ -61,7 +83,7 @@ flutter analyze
 flutter test
 ```
 
-Flutter UI tests use a fake Nyxi backend; they never issue real cards. Backend Worker code lives in [petal-backend](https://github.com/kawaiiepic/petal-backend).
+Flutter UI tests use a fake Nyxi backend; the gateway test also checks the `/nyxi` request prefix using a local HTTP server. They never issue real cards. Backend Worker code lives in [petal-backend](https://github.com/kawaiiepic/petal-backend).
 
 ## Security and production readiness
 
