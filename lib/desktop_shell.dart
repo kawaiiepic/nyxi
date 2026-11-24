@@ -1,3 +1,5 @@
+// Keep the Flutter SDK import for compatibility with pre-3.47 builds.
+// ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 

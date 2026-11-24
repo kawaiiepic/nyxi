@@ -1,5 +1,7 @@
 import 'dart:async';
 
+// Keep the Flutter SDK import for compatibility with pre-3.47 builds.
+// ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 
 import 'fluz_gateway.dart';
