@@ -1,15 +1,14 @@
 # Nyxi ✦
 
-A cybercute Flutter finance dashboard with Cupertino, `liquid_glass_widgets`, and a separate authenticated Fluz backend. No demo mode, fictional balances, transactions, cards, or guest sign-in.
+A cybercute Flutter finance dashboard with Cupertino, `liquid_glass_widgets`, and an authenticated Cloudflare Worker backend. No demo mode, fictional balances, transactions, cards, or guest sign-in.
 
 ## Repositories
 
 - **Flutter app:** [kawaiiepic/nyxi](https://github.com/kawaiiepic/nyxi) (this repository)
-- **Fluz API + Docker Compose deployment:** [kawaiiepic/nyxi-backend](https://github.com/kawaiiepic/nyxi-backend) (private)
+- **Cloudflare Worker + D1:** [kawaiiepic/petal-backend](https://github.com/kawaiiepic/petal-backend) (private)
+- **Legacy VPS backend:** [kawaiiepic/nyxi-backend](https://github.com/kawaiiepic/nyxi-backend) (migration reference only)
 
-All financial API credentials, Fluz OAuth secrets, transaction webhook verification and SQLite storage belong to **`nyxi-backend`**. The Flutter app never needs a Fluz API key.
-
-The public [Nyxi landing page](https://nyxi.blossomvale.dev/) is served separately through Traefik when deployed with the backend repository's optional Traefik Compose overlay. On the same domain, `/api/*` and `/health` route to the authenticated Node API. The landing page itself doesn't contain financial data. The backend repository includes the `Dockerfile`, `docker-compose.yml`, `.env.example`, `.dockerignore`, tests and deployment guide.
+The app now connects to the shared Petal Worker under `/nyxi`, with separate Nyxi accounts and encrypted Fluz credentials. No VPS, Docker or Traefik is needed for the API. Registration is enabled by default. The public landing page is independent of this API.
 
 ## Run Flutter
 
@@ -19,17 +18,17 @@ flutter pub get
 flutter run -d linux
 ```
 
-Flutter 3.41+ is required. Platform runner directories are generated locally. The API origin is hardcoded in `lib/fluz_gateway.dart` to **`https://nyxi.blossomvale.dev`** on all platforms; no `--dart-define` is needed. Your backend must be reachable via **HTTPS** from the device. For development only, Nyxi also allows `localhost`, `127.0.0.1`, and Android emulator `10.0.2.2` over plain HTTP. Android/iOS devices cannot use the Linux desktop's `127.0.0.1`; use your backend HTTPS hostname.
+Flutter 3.41+ is required. Platform runner directories are generated locally. The API origin is hardcoded in `lib/fluz_gateway.dart` to **`https://petal-backend.blossomvale.dev/nyxi`** on all platforms; no `--dart-define` is needed. Your backend must be reachable via **HTTPS** from the device. For development only, Nyxi also allows `localhost`, `127.0.0.1`, and Android emulator `10.0.2.2` over plain HTTP. Android/iOS devices cannot use the Linux desktop's `127.0.0.1`; use your backend HTTPS hostname.
 
-Use the separate backend repository to configure the `.env` secrets, Docker Compose service, HTTPS proxy, Fluz OAuth callback, and transaction webhooks.
+Use the [Worker deployment guide](https://github.com/kawaiiepic/petal-backend/blob/main/docs/nyxi.md) to deploy migrations, configure Cloudflare secrets and update Fluz OAuth and webhook URLs. Old VPS accounts are not transferred automatically.
 
 ## Account and Fluz connection
 
 - Nyxi requires a valid authenticated central-backend session. No guest, offline, or demo-only access.
-- On startup, and approximately every 12 seconds while the app is ready, it checks `GET /health` and `GET /api/auth/me`. An unresponsive or invalid backend locks the dashboard until authentication and health recover.
+- On startup, and approximately every 12 seconds while the app is ready, it checks `GET /nyxi/health` and `GET /nyxi/api/auth/me`. An unresponsive or invalid backend locks the dashboard until authentication and health recover.
 - Sessions are held in memory only. Restarting Nyxi requires signing in again.
 - **OAuth mode:** In **Cards → Connect Fluz**, Nyxi opens Fluz's authorization page. The backend handles the callback, stores encrypted tokens, and connects the correct Nyxi account.
-- **Single-account API-key mode:** Set `FLUZ_AUTH_MODE=api_key`, `FLUZ_API_KEY`, `FLUZ_USER_ID`, `FLUZ_ACCOUNT_ID`, and `NYXI_FLUZ_OWNER_USER_ID` in the [backend's private `.env`](https://github.com/kawaiiepic/nyxi-backend/blob/main/.env.example). The designated Nyxi login automatically shows Fluz as server-managed, without an OAuth popup. The key is **never entered in Flutter** and is not shared with other Nyxi accounts. See the [backend API-key setup guide](https://github.com/kawaiiepic/nyxi-backend#personal-fluz-api-key-mode-no-oauth-client-id-needed).
+- **Single-account API-key mode:** Set `FLUZ_AUTH_MODE=api_key`, `FLUZ_API_KEY`, `FLUZ_USER_ID`, `FLUZ_ACCOUNT_ID`, and `NYXI_FLUZ_OWNER_USER_ID` as Worker bindings and secrets. The designated Nyxi login automatically shows Fluz as server-managed, without an OAuth popup. The key is **never entered in Flutter** and is not shared with other Nyxi accounts. See the [backend API-key setup guide](https://github.com/kawaiiepic/petal-backend/blob/main/docs/nyxi.md).
 - An approved Fluz OAuth Integration application is still needed to connect *distinct users*. Live API-key mode may also be restricted if Fluz hasn't activated your developer application. The backend is not yet verified with live credentials or card programs.
 
 ## Live financial data
@@ -62,7 +61,7 @@ flutter analyze
 flutter test
 ```
 
-Flutter UI tests use a fake Nyxi backend; they never issue real cards. Backend Node tests and container build checks now live in [nyxi-backend](https://github.com/kawaiiepic/nyxi-backend).
+Flutter UI tests use a fake Nyxi backend; they never issue real cards. Backend Worker code lives in [petal-backend](https://github.com/kawaiiepic/petal-backend).
 
 ## Security and production readiness
 

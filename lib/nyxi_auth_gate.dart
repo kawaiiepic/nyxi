@@ -137,6 +137,10 @@ class _NyxiAuthGateState extends State<NyxiAuthGate>
       setState(() => _formError = 'Enter your email address and password.');
       return;
     }
+    if (_creatingAccount && (password.length < 12 || password.length > 128)) {
+      setState(() => _formError = 'Choose a password with 12–128 characters.');
+      return;
+    }
     setState(() {
       _formError = null;
       _phase = _GatePhase.authenticating;
@@ -147,8 +151,8 @@ class _NyxiAuthGateState extends State<NyxiAuthGate>
       password,
       register: _creatingAccount,
     );
-    _password.clear();
     if (!mounted) return;
+    _password.clear();
 
     if (!_controller.signedIn || !_controller.api.signedIn) {
       final message = _controller.error ?? 'Unable to sign in.';

@@ -1,7 +1,38 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nyxi/fluz_gateway.dart';
 
 void main() {
+  test('registration and health preserve Worker namespace', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final paths = <String>[];
+    final sub = server.listen((request) async {
+      paths.add(request.uri.path);
+      request.response.headers.contentType = ContentType.json;
+      if (request.uri.path.endsWith('/health')) {
+        request.response.write(jsonEncode({'service': 'nyxi-api', 'status': 'ok'}));
+      } else {
+        await utf8.decoder.bind(request).join();
+        request.response.statusCode = 201;
+        request.response.write(jsonEncode({'token': 'test-token', 'user': {'id': 'new-user', 'email': 'test@example.com'}}));
+      }
+      await request.response.close();
+    });
+    final gateway = FluzGateway(baseUrl: 'http://127.0.0.1:${server.port}/nyxi');
+    try {
+      expect(await gateway.health(), isTrue);
+      expect((await gateway.register('test@example.com', 'long-password')).id, 'new-user');
+      expect(paths, ['/nyxi/health', '/nyxi/api/auth/register']);
+      expect(gateway.signedIn, isTrue);
+    } finally {
+      gateway.close();
+      await server.close(force: true);
+      await sub.cancel();
+    }
+  });
+
   test('Fluz cards expose only masked data', () {
     final card = FluzCard.fromJson({
       'id': 'issued-card',
