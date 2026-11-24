@@ -74,7 +74,11 @@ Set these repository Actions secrets before dispatching the workflow:
 - `BUILD_PROVISION_PROFILE_BASE64`: base64 of the Nyxi `.mobileprovision` file.
 - `APPSTORE_ISSUER_ID`, `APPSTORE_API_KEY_ID`, `APPSTORE_API_PRIVATE_KEY`: the App Store Connect team issuer, matching key ID, and full `.p8` contents.
 
-The workflow checks that the profile matches Nyxi, exports a signed IPA, and submits it to TestFlight. Never commit the signing files or paste their contents into chat.
+The workflow checks that the profile matches Nyxi, exports a signed IPA, submits it to TestFlight and waits for Apple processing. The iOS Info.plist and upload action declare exempt encryption; verify this declaration against all bundled dependencies before distributing.
+
+Before uploading, complete App Store Connect → Nyxi → TestFlight → Test Information with a beta description, a real tester feedback email, and the primary locale. Alternatively, set the `TESTFLIGHT_FEEDBACK_EMAIL` repository secret and the repository Actions variable `NYXI_CONFIGURE_TESTFLIGHT_INFO` to `true`. The next upload workflow will use the pinned Apple Actions metadata helper to create or update the English (US) Test Information before building. Disable that variable after setup to avoid overwriting manually edited information on subsequent releases. The feedback address is visible to testers. If the primary app locale is not English (US), use the App Store Connect UI to configure the correct locale instead.
+
+Never commit the signing files or paste their contents into chat.
 
 ## Tests
 

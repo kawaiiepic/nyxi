@@ -24,6 +24,39 @@ jobs:
       NYXI_TEAM_ID: 7H8MNYGZ49
     steps:
       - uses: actions/checkout@v6
+      - name: Check out TestFlight metadata helper
+        if: ${{ inputs.upload_testflight && vars.NYXI_CONFIGURE_TESTFLIGHT_INFO == 'true' }}
+        uses: actions/checkout@v6
+        with:
+          repository: Apple-Actions/upload-testflight-build
+          ref: 665328adbecbc3ad929d3da710696d928b8a7ba9
+          path: .testflight-tools
+          persist-credentials: false
+      - name: Configure TestFlight Test Information
+        if: ${{ inputs.upload_testflight && vars.NYXI_CONFIGURE_TESTFLIGHT_INFO == 'true' }}
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          TESTFLIGHT_FEEDBACK_EMAIL: ${{ secrets.TESTFLIGHT_FEEDBACK_EMAIL }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$TESTFLIGHT_FEEDBACK_EMAIL" ]]; then
+            echo "::error::Set the TESTFLIGHT_FEEDBACK_EMAIL repository secret to a real feedback address before enabling metadata setup."
+            exit 1
+          fi
+          umask 077
+          key=$(mktemp "$RUNNER_TEMP/nyxi-asc-key.XXXXXX")
+          trap 'rm -f "$key"; rm -rf .testflight-tools' EXIT
+          printf '%s' "$APPSTORE_API_PRIVATE_KEY" > "$key"
+          bash .testflight-tools/scripts/populate-test-information.sh \
+            --dir "$GITHUB_WORKSPACE" --apply \
+            --bundle-id "$NYXI_BUNDLE_ID" --locale en-US \
+            --description "Nyxi is a personal finance dashboard. Test account registration, sign-in, navigation, and authorized Fluz wallet and transaction views where configured. Report errors or usability issues without including financial or account secrets." \
+            --feedback-email "$TESTFLIGHT_FEEDBACK_EMAIL" \
+            --issuer-id "$APPSTORE_ISSUER_ID" \
+            --api-key-id "$APPSTORE_API_KEY_ID" \
+            --api-private-key-path "$key"
       - name: Install signing credentials
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
@@ -110,4 +143,5 @@ jobs:
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          uses-non-exempt-encryption: 'false'
           wait-for-processing: true
